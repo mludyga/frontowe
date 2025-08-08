@@ -39,9 +39,9 @@ function distributeAutoGaps(leftover: number, autos: number, weights?: number[])
 }
 
 // Layout stałe
-const LABEL_COL_MM = 48;
-const MODULE_GUTTER_MM = 140;
-const TOP_MARGIN_MM = 46;
+const LABEL_COL_MM = 148;
+const MODULE_GUTTER_MM = 280;
+const TOP_MARGIN_MM = 146;
 
 // === BLOK RYSUNKU ===
 function LayoutBlock({
