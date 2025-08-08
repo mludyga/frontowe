@@ -178,12 +178,12 @@ function LayoutBlock({
   );
 
   return (
-    <g>
-      {frame}
-      {elems}
-      {dims}
-    </g>
-  );
+  <g>
+    {elems}   {/* panele + wszystkie przerwy (w tym górna) */}
+    {frame}   {/* rama NA WIERZCHU */}
+    {dims}    {/* wymiary na samym końcu */}
+  </g>
+);
 }
 
 export default function KalkulatorPalisada() {
