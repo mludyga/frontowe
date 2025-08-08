@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { JSX } from "react"; // dla typu JSX.Element
+import type { JSX } from "react";
 
 type Unit = "mm" | "cm" | "in";
 type PanelGroup = { qty: number; t: number; inGate?: boolean };
@@ -38,10 +38,10 @@ function distributeAutoGaps(leftover: number, autos: number, weights?: number[])
   return weights.map((w) => (w / wsum) * leftover);
 }
 
-// Layout
-const LABEL_COL_MM = 248;
-const MODULE_GUTTER_MM = 200;
-const TOP_MARGIN_MM = 546;
+// Layout stałe
+const LABEL_COL_MM = 48;
+const MODULE_GUTTER_MM = 140;
+const TOP_MARGIN_MM = 46;
 
 // === BLOK RYSUNKU ===
 function LayoutBlock({
@@ -60,7 +60,7 @@ function LayoutBlock({
         <rect x={X} y={Y} width={W} height={H} fill={fill} stroke={s} vectorEffect="non-scaling-stroke" />
         {label ? (
           <text
-            x={(x + outerW) * scale + 12}
+            x={(x + outerW) * scale + 10}
             y={Y + H / 2}
             dominantBaseline="middle"
             fontSize={12}
@@ -99,7 +99,7 @@ function LayoutBlock({
         <g>
           <rect x={x0 * scale} y={cursorY * scale} width={outerW * scale} height={Math.max(0, g) * scale} fill="#f1f5f9" stroke="#64748b" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
           <text
-            x={(x0 + outerW) * scale + 12}
+            x={(x0 + outerW) * scale + 10}
             y={(cursorY + Math.max(0, g) / 2) * scale}
             dominantBaseline="middle"
             fontSize={12}
@@ -119,7 +119,7 @@ function LayoutBlock({
       <g>
         <rect x={x0 * scale} y={cursorY * scale} width={outerW * scale} height={Math.max(0, gBottom) * scale} fill="#f1f5f9" stroke="#64748b" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
         <text
-          x={(x0 + outerW) * scale + 12}
+          x={(x0 + outerW) * scale + 10}
           y={(cursorY + Math.max(0, gBottom) / 2) * scale}
           dominantBaseline="middle"
           fontSize={12}
@@ -133,11 +133,13 @@ function LayoutBlock({
 
   const dims = (
     <g>
-      <line x1={0} y1={(outerH + 20) * scale} x2={(outerW + LABEL_COL_MM) * scale} y2={(outerH + 20) * scale} stroke="#333" markerEnd="url(#arrowhead)" markerStart="url(#arrowhead)" vectorEffect="non-scaling-stroke" />
-      <text x={((outerW + LABEL_COL_MM) * scale) / 2} y={(outerH + 14) * scale} textAnchor="middle" fontSize={12} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}>{`${outerW} mm`}</text>
+      {/* szerokość */}
+      <line x1={0} y1={(outerH + 28) * scale} x2={(outerW + LABEL_COL_MM) * scale} y2={(outerH + 28) * scale} stroke="#333" markerEnd="url(#arrowhead)" markerStart="url(#arrowhead)" vectorEffect="non-scaling-stroke" />
+      <text x={((outerW + LABEL_COL_MM) * scale) / 2} y={(outerH + 22) * scale} textAnchor="middle" fontSize={12} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}>{`${outerW} mm`}</text>
 
-      <line x1={(outerW + LABEL_COL_MM + 20) * scale} y1={0} x2={(outerW + LABEL_COL_MM + 20) * scale} y2={outerH * scale} stroke="#333" markerEnd="url(#arrowhead)" markerStart="url(#arrowhead)" vectorEffect="non-scaling-stroke" />
-      <text x={(outerW + LABEL_COL_MM + 26) * scale} y={(outerH * scale) / 2} fontSize={12} transform={`rotate(90 ${(outerW + LABEL_COL_MM + 26) * scale} ${(outerH * scale) / 2})`} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}>{`${outerH} mm`}</text>
+      {/* wysokość */}
+      <line x1={(outerW + LABEL_COL_MM + 28) * scale} y1={0} x2={(outerW + LABEL_COL_MM + 28) * scale} y2={outerH * scale} stroke="#333" markerEnd="url(#arrowhead)" markerStart="url(#arrowhead)" vectorEffect="non-scaling-stroke" />
+      <text x={(outerW + LABEL_COL_MM + 36) * scale} y={(outerH * scale) / 2} fontSize={12} transform={`rotate(90 ${(outerW + LABEL_COL_MM + 36) * scale} ${(outerH * scale) / 2})`} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}>{`${outerH} mm`}</text>
 
       <text x={0} y={-8} fontSize={14} fontWeight={600} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}> {title} </text>
     </g>
@@ -177,6 +179,7 @@ export default function KalkulatorPalisada() {
   const [orderNo, setOrderNo] = useState<string>("");
   const [scale, setScale] = useState<number>(0.2);
 
+  // listy paneli
   const panelList = useMemo(() => {
     const arr: number[] = [];
     for (const g of groups) for (let i = 0; i < g.qty; i++) arr.push(g.t);
@@ -224,6 +227,7 @@ export default function KalkulatorPalisada() {
     });
   }, [gapCountSpan]);
 
+  // obliczenia przerw przęsła
   const spanCalc = useMemo(() => {
     if (nPanels === 0) return { gaps: [] as number[], error: "" };
     if (gapMode === "equal") {
@@ -266,15 +270,16 @@ export default function KalkulatorPalisada() {
   const spanGaps = spanCalc.gaps;
   const spanGapError = spanCalc.error;
 
+  // przerwy środkowe przęsła (bez top/bottom przy ramie)
   const spanMidGaps = useMemo(() => {
     const countMid = Math.max(0, nPanels - 1);
     return hasFrame ? spanGaps.slice(1, 1 + countMid) : spanGaps.slice(0, countMid);
   }, [hasFrame, spanGaps, nPanels]);
 
+  // przerwy środkowe do bramy/furtki (tylko między panelami które wejdą do bramy)
   const baseMidGapsGate = useMemo(() => {
     const mids: number[] = [];
     for (let i = 0; i < Math.max(0, nPanels - 1); i++) {
-      // użyjemy tylko przerw między panelami, które faktycznie trafiają do bramy/furtki
       const both = (includeMask[i] ?? true) && (includeMask[i + 1] ?? true);
       if (both) mids.push(spanMidGaps[i] ?? 0);
     }
@@ -341,6 +346,29 @@ export default function KalkulatorPalisada() {
       wicketGapBetweenExtras
     );
   }, [gateType, wicketHeight, panelsForGate, baseMidGapsGate, topGapForGateValue, wicketExtraPanels, wicketGapAfterBase, wicketGapBetweenExtras]);
+
+  // sumy składowe i całkowite (dla widoku i SVG)
+  const sumSpanGaps = useMemo(() => sum(spanGaps), [spanGaps]);
+  const spanTotalByParts = useMemo(
+    () => sumPanels + sumSpanGaps + (hasFrame ? 2 * frameVert : 0),
+    [sumPanels, sumSpanGaps, hasFrame, frameVert]
+  );
+
+  const gateTotals = useMemo(() => {
+    if (!gate) return null;
+    const p = sum(gate.panels);
+    const gsum = sum(gate.gaps);
+    const total = p + gsum + 2 * frameVert; // brama zawsze z ramą
+    return { p, gsum, total };
+  }, [gate, frameVert]);
+
+  const wicketTotals = useMemo(() => {
+    if (!wicket) return null;
+    const p = sum(wicket.panels);
+    const gsum = sum(wicket.gaps);
+    const total = p + gsum + 2 * frameVert; // furtka zawsze z ramą
+    return { p, gsum, total };
+  }, [wicket, frameVert]);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
 
@@ -446,9 +474,9 @@ export default function KalkulatorPalisada() {
     const bytes = await pdf.save();
     downloadBlob("projekt-ogrodzenia.pdf", new Blob([bytes], { type: "application/pdf" }));
   }
-
   void exportPDFfromPNG;
 
+  // rozmiary całego rysunku
   const totalWidthMM = useMemo(() => {
     let w = 0;
     w += spanWidth + LABEL_COL_MM;
@@ -459,13 +487,13 @@ export default function KalkulatorPalisada() {
       w += MODULE_GUTTER_MM;
       w += wicketWidth + LABEL_COL_MM;
     }
-    return w + 40;
+    return w + 60;
   }, [spanWidth, gateType, gateWidth, wicketWidth]);
 
   const maxHeightMM = useMemo(() => {
     let h = spanHeight;
     if (gateType !== "none") h = Math.max(h, gateHeight, wicketHeight);
-    return h + TOP_MARGIN_MM + 50;
+    return h + TOP_MARGIN_MM + 60;
   }, [spanHeight, gateType, gateHeight, wicketHeight]);
 
   return (
@@ -645,7 +673,6 @@ export default function KalkulatorPalisada() {
                   </label>
                 </div>
               )}
-
             </div>
           )}
         </div>
@@ -653,10 +680,19 @@ export default function KalkulatorPalisada() {
         {/* Kolumna 3 – Podsumowanie */}
         <div className="space-y-2 p-3 rounded-xl border text-sm">
           <div className="font-semibold">Podsumowanie</div>
-          <div>Liczba paneli (przęsło): <b>{nPanels}</b></div>
+
+          <div className="font-medium mt-1">Przęsło</div>
           <div>Suma paneli: <b>{Math.round(sumPanels)} mm</b></div>
-          <div>Wysokość wewnętrzna przęsła: <b>{Math.round(spanInternalHeight)} mm</b></div>
-          <div>Przerw (przęsło): <b>{gapCountSpan}</b></div>
+          <div>Wysokość przęsła (zadana): <b>{Math.round(spanHeight)} mm</b></div>
+          <div>
+            Składniki:&nbsp;
+            panele <b>{Math.round(sumPanels)}</b> + przerwy <b>{Math.round(sumSpanGaps)}</b>
+            {hasFrame ? <> + rama <b>{2 * frameVert}</b></> : null}
+            &nbsp;= <b>{Math.round(spanTotalByParts)} mm</b>
+            {Math.abs(spanTotalByParts - spanHeight) > 0 ? (
+              <span className="text-red-600"> (≠ {Math.round(spanHeight)} mm)</span>
+            ) : null}
+          </div>
 
           {baseError ? (
             <div className="text-red-600">{baseError}</div>
@@ -664,7 +700,7 @@ export default function KalkulatorPalisada() {
             <div className="text-red-600">{spanGapError}</div>
           ) : (
             <div>
-              <div className="font-medium mt-2">Przerwy przęsła:</div>
+              <div className="mt-1">Przerwy (lista):</div>
               <div className="flex flex-wrap gap-1">
                 {spanGaps.map((g, i) => (
                   <span key={i} className="px-2 py-1 bg-slate-100 rounded">{`${g} mm`}</span>
@@ -674,74 +710,88 @@ export default function KalkulatorPalisada() {
           )}
 
           {gateType !== "none" && (
-            <div>
-              <div className="font-medium mt-2">Brama:</div>
+            <>
+              <div className="font-medium mt-3">Brama</div>
               {gate?.error ? (
                 <div className="text-red-600">{gate.error}</div>
               ) : (
-                <div className="flex flex-wrap gap-1">
-                  {gate?.gaps?.map((g, i) => (
-                    <span key={i} className="px-2 py-1 bg-slate-100 rounded">{`${g} mm`}</span>
-                  ))}
-                </div>
+                <>
+                  <div>Wysokość bramy (zadana): <b>{Math.round(gateHeight)} mm</b></div>
+                  <div>
+                    Składniki:&nbsp;
+                    panele <b>{gateTotals ? Math.round(gateTotals.p) : 0}</b> +
+                    przerwy <b>{gateTotals ? Math.round(gateTotals.gsum) : 0}</b> +
+                    rama <b>{2 * frameVert}</b>
+                    &nbsp;= <b>{gateTotals ? Math.round(gateTotals.total) : 0} mm</b>
+                    {gateTotals && Math.abs(gateTotals.total - gateHeight) > 0 ? (
+                      <span className="text-red-600"> (≠ {Math.round(gateHeight)} mm)</span>
+                    ) : null}
+                  </div>
+                </>
               )}
 
-              <div className="font-medium mt-2">Furtka:</div>
+              <div className="font-medium mt-3">Furtka</div>
               {wicket?.error ? (
                 <div className="text-red-600">{wicket.error}</div>
               ) : (
-                <div className="flex flex-wrap gap-1">
-                  {wicket?.gaps?.map((g, i) => (
-                    <span key={i} className="px-2 py-1 bg-slate-100 rounded">{`${g} mm`}</span>
-                  ))}
-                </div>
+                <>
+                  <div>Wysokość furtki (zadana): <b>{Math.round(wicketHeight)} mm</b></div>
+                  <div>
+                    Składniki:&nbsp;
+                    panele <b>{wicketTotals ? Math.round(wicketTotals.p) : 0}</b> +
+                    przerwy <b>{wicketTotals ? Math.round(wicketTotals.gsum) : 0}</b> +
+                    rama <b>{2 * frameVert}</b>
+                    &nbsp;= <b>{wicketTotals ? Math.round(wicketTotals.total) : 0} mm</b>
+                    {wicketTotals && Math.abs(wicketTotals.total - wicketHeight) > 0 ? (
+                      <span className="text-red-600"> (≠ {Math.round(wicketHeight)} mm)</span>
+                    ) : null}
+                  </div>
+                </>
               )}
-            </div>
+            </>
           )}
         </div>
       </div>
-	  
-	  {/* Pasek eksportu – zawsze widoczny */}
-<div className="p-3 rounded-xl border flex flex-wrap items-end gap-4">
-  <label className="block">
-    <span className="block text-sm font-medium">Skala (px/mm – podgląd)</span>
-    <input
-      type="range"
-      min={0.05}
-      max={0.6}
-      step={0.01}
-      value={scale}
-      onChange={(e) => setScale(e.currentTarget.valueAsNumber || 0.2)}
-    />
-  </label>
 
-  <label className="block">
-    <span className="block text-sm font-medium">Nr zlecenia/oferty</span>
-    <input
-      type="text"
-      className="input"
-      value={orderNo}
-      onChange={(e) => setOrderNo(e.currentTarget.value)}
-    />
-  </label>
+      {/* Pasek eksportu – zawsze widoczny */}
+      <div className="p-3 rounded-xl border flex flex-wrap items-end gap-4">
+        <label className="block">
+          <span className="block text-sm font-medium">Skala (px/mm – podgląd)</span>
+          <input
+            type="range"
+            min={0.05}
+            max={0.6}
+            step={0.01}
+            value={scale}
+            onChange={(e) => setScale(e.currentTarget.valueAsNumber || 0.2)}
+          />
+        </label>
 
-  <div className="flex gap-2 ml-auto">
-    <button className="px-3 py-2 rounded border" onClick={() => exportSVG()}>
-      Pobierz SVG
-    </button>
-    <button className="px-3 py-2 rounded border" onClick={() => exportPNG(300)}>
-      PNG 300 DPI
-    </button>
-    <button className="px-3 py-2 rounded border" onClick={() => exportPNG(150)}>
-      PNG 150 DPI
-    </button>
-    {/* Jeśli chcesz też PDF z PNG:
-    <button className="px-3 py-2 rounded border" onClick={() => exportPDFfromPNG(300)}>
-      PDF (z PNG)
-    </button> */}
-  </div>
-</div>
+        <label className="block">
+          <span className="block text-sm font-medium">Nr zlecenia/oferty</span>
+          <input
+            type="text"
+            className="input"
+            value={orderNo}
+            onChange={(e) => setOrderNo(e.currentTarget.value)}
+          />
+        </label>
 
+        <div className="flex gap-2 ml-auto">
+          <button className="px-3 py-2 rounded border" onClick={() => exportSVG()}>
+            Pobierz SVG
+          </button>
+          <button className="px-3 py-2 rounded border" onClick={() => exportPNG(300)}>
+            PNG 300 DPI
+          </button>
+          <button className="px-3 py-2 rounded border" onClick={() => exportPNG(150)}>
+            PNG 150 DPI
+          </button>
+          {/* <button className="px-3 py-2 rounded border" onClick={() => exportPDFfromPNG(300)}>
+            PDF (z PNG)
+          </button> */}
+        </div>
+      </div>
 
       {/* Rysunek */}
       <div className="p-3 rounded-xl border overflow-auto bg-white">
@@ -761,10 +811,13 @@ export default function KalkulatorPalisada() {
               Skala podglądu: {scale.toFixed(2)} px/mm
             </text>
             {[
-              `Panele: ${nPanels} szt.; suma: ${Math.round(sumPanels)} mm; wewn. przęsła: ${Math.round(spanInternalHeight)} mm`,
-              `Przerwy przęsła: ${spanGaps.join(" ") || "-"}`,
-              gate ? `Brama – przerwy: ${gate.gaps.join(" ")}` : null,
-              wicket ? `Furtka – przerwy: ${wicket.gaps.join(" ")}` : null,
+              `Przęsło – panele: ${Math.round(sumPanels)}; przerwy: ${Math.round(sumSpanGaps)}; rama: ${hasFrame ? 2*frameVert : 0}; suma: ${Math.round(spanTotalByParts)} (zadane: ${Math.round(spanHeight)})`,
+              gate && gateTotals
+                ? `Brama – panele: ${Math.round(gateTotals.p)}; przerwy: ${Math.round(gateTotals.gsum)}; rama: ${2*frameVert}; suma: ${Math.round(gateTotals.total)} (zadane: ${Math.round(gateHeight)})`
+                : null,
+              wicket && wicketTotals
+                ? `Furtka – panele: ${Math.round(wicketTotals.p)}; przerwy: ${Math.round(wicketTotals.gsum)}; rama: ${2*frameVert}; suma: ${Math.round(wicketTotals.total)} (zadane: ${Math.round(wicketHeight)})`
+                : null,
             ]
               .filter(Boolean)
               .map((line, i) => (
