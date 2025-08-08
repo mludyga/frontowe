@@ -1,0 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* przenosimy klas .input tutaj, eby @apply dziaa */
+.input { @apply w-full px-2 py-1 border rounded; }
