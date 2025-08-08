@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { JSX } from "react"; // dla typu JSX.Element
 
 type Unit = "mm" | "cm" | "in";
 type PanelGroup = { qty: number; t: number; inGate?: boolean };
@@ -445,6 +446,8 @@ export default function KalkulatorPalisada() {
     const bytes = await pdf.save();
     downloadBlob("projekt-ogrodzenia.pdf", new Blob([bytes], { type: "application/pdf" }));
   }
+
+  void exportPDFfromPNG;
 
   const totalWidthMM = useMemo(() => {
     let w = 0;
