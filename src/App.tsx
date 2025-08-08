@@ -85,37 +85,39 @@ function LayoutBlock({
     </g>
   );
 
-  // narysuj górną przerwę (między ramą a 1. panelem), jeśli jest rama
-if (withFrame) {
-  const gTop = gaps[0] ?? 0;
-  if (gTop > 0) {
-    elems.push(
-      <g>
-        <rect
-          x={x0 * scale}
-          y={(y0 + frameT) * scale}
-          width={outerW * scale}
-          height={gTop * scale}
-          fill="#f1f5f9"
-          stroke="#64748b"
-          strokeDasharray="4 3"
-          vectorEffect="non-scaling-stroke"
-        />
-        <text
-          x={(x0 + outerW) * scale + 10}
-          y={(y0 + frameT + gTop / 2) * scale}
-          dominantBaseline="middle"
-          fontSize={12}
-          style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
-        >
-          {`${Math.round(gTop)} mm`}
-        </text>
-      </g>
-    );
-  }
-}
-
+  // --- zbieramy elementy rysunku ---
   const elems: JSX.Element[] = [];
+
+  // narysuj GÓRNĄ przerwę, jeśli jest rama i przerwa > 0
+  if (withFrame) {
+    const gTop = gaps[0] ?? 0;
+    if (gTop > 0) {
+      elems.push(
+        <g>
+          <rect
+            x={x0 * scale}
+            y={(y0 + frameT) * scale}
+            width={outerW * scale}
+            height={gTop * scale}
+            fill="#f1f5f9"
+            stroke="#64748b"
+            strokeDasharray="4 3"
+            vectorEffect="non-scaling-stroke"
+          />
+          <text
+            x={(x0 + outerW) * scale + 10}
+            y={(y0 + frameT + gTop / 2) * scale}
+            dominantBaseline="middle"
+            fontSize={12}
+            style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
+          >
+            {`${Math.round(gTop)} mm`}
+          </text>
+        </g>
+      );
+    }
+  }
+
   let cursorY = withFrame ? frameT + (gaps[0] ?? 0) : 0;
   let gapIdx = withFrame ? 1 : 0;
 
