@@ -9,7 +9,7 @@ type GateType = "none" | "skrzydłowa" | "przesuwna";
 type CustomGap = { value: number | null; locked: boolean };
 type GateLayout = { panels: number[]; gaps: number[]; error?: string };
 
-// --- utils lokalne ---
+// helpers
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 const parseNumber = (raw: string) => {
   if (raw.trim() === "") return NaN;
@@ -24,7 +24,7 @@ function distributeAutoGaps(leftover: number, autos: number, weights?: number[])
   return weights.map((w) => (w / wsum) * leftover);
 }
 
-// --- stałe layoutu ---
+// stałe layoutu
 const MODULE_GUTTER_MM = 180;
 const TOP_MARGIN_MM = 446;
 
@@ -48,11 +48,22 @@ export default function App() {
   const [gateWidth, setGateWidth] = useState<number>(4000);
   const [gateHeight, setGateHeight] = useState<number>(1400);
 
-  // przestrzeń 2 – wsporniki pod dolną ramą (wewnątrz modułu)
+  // PRZESTRZEŃ 2 – wsporniki
   const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
   const [gateBottomSupportH, setGateBottomSupportH] = useState<number>(80);
   const [gateBottomExtraPerSpan, setGateBottomExtraPerSpan] = useState<number>(0);
 
+  // PRZESTRZEŃ 2 – pełny profil (strip)
+  const [gateStripEnabled, setGateStripEnabled] = useState<boolean>(false);
+  const [gateStripH, setGateStripH] = useState<number>(0);
+
+  // PRZESTRZEŃ 2 – OMEGA (może wystawać)
+  const [gateOmegaEnabled, setGateOmegaEnabled] = useState<boolean>(false);
+  const [gateOmegaH, setGateOmegaH] = useState<number>(0);
+  const [gateOmegaOverL, setGateOmegaOverL] = useState<number>(0);
+  const [gateOmegaOverR, setGateOmegaOverR] = useState<number>(0);
+
+  // FURTKA
   const [wicketWidth, setWicketWidth] = useState<number>(1000);
   const [wicketHeight, setWicketHeight] = useState<number>(1400);
 
@@ -68,10 +79,7 @@ export default function App() {
   const [orderNo, setOrderNo] = useState<string>("");
   const [scale, setScale] = useState<number>(0.2);
 
-  // aftery po HOOKACH: wysokość pasa wsporników (0 gdy wyłączone)
-  const gateBottomH = gateBottomEnabled ? gateBottomSupportH : 0;
-
-  // listy paneli dla przęsła
+  // listy paneli
   const panelList = useMemo(() => {
     const arr: number[] = [];
     for (const g of groups) for (let i = 0; i < g.qty; i++) arr.push(g.t);
@@ -105,7 +113,7 @@ export default function App() {
     [hasFrame, spanHeight, frameVert]
   );
 
-  // ile przerw trzeba policzyć
+  // ile przerw
   const gapCountSpan = useMemo(() => {
     if (nPanels <= 0) return 0;
     return hasFrame ? nPanels + 1 : Math.max(0, nPanels - 1);
@@ -117,7 +125,7 @@ export default function App() {
     return null;
   }, [nPanels, sumPanels, spanInternalHeight]);
 
-  // zsynchronizuj długość wektora customGaps
+  // zsynchronizuj customGaps
   useEffect(() => {
     setCustomGaps((prev) => {
       const expected = gapCountSpan;
@@ -162,7 +170,6 @@ export default function App() {
     const out: number[] = [];
     let ap = 0;
     for (let i = 0; i < expected; i++) out.push(round2(vec[i].value == null ? autosVals[ap++] : vec[i].value!));
-    // drobna korekta na końcu
     const corr = spanInternalHeight - sumPanels - sum(out);
     if (Math.abs(corr) >= 0.5) out[out.length - 1] = round2(out[out.length - 1] + corr);
     return { gaps: out, error: "" };
@@ -177,7 +184,7 @@ export default function App() {
     return hasFrame ? spanGaps.slice(1, 1 + countMid) : spanGaps.slice(0, countMid);
   }, [hasFrame, spanGaps, nPanels]);
 
-  // przerwy środkowe do bramy/furtki
+  // przerwy środkowe do bramy/furtki (tylko tam, gdzie panele „wchodzą” do bramy)
   const baseMidGapsGate = useMemo(() => {
     const mids: number[] = [];
     for (let i = 0; i < Math.max(0, nPanels - 1); i++) {
@@ -254,56 +261,72 @@ export default function App() {
     );
   }, [gateType, wicketHeight, panelsForGate, baseMidGapsGate, topGapForGateValue, wicketExtraPanels, wicketGapAfterBase, wicketGapBetweenExtras]);
 
-  // sumy składowe
+  // sumy składowe i całkowite
   const sumSpanGaps = useMemo(() => sum(spanGaps), [spanGaps]);
   const spanTotalByParts = useMemo(
     () => sumPanels + sumSpanGaps + (hasFrame ? 2 * frameVert : 0),
     [sumPanels, sumSpanGaps, hasFrame, frameVert]
   );
 
+  // wysokość „Przestrzeni 2” przy bramie (render i podsumowanie)
+  const gateExtraH = useMemo(() => {
+    const supports = gateBottomEnabled ? gateBottomSupportH : 0;
+    const strip = gateStripEnabled ? gateStripH : 0;
+    const omg = gateOmegaEnabled ? gateOmegaH : 0;
+    return Math.max(supports, strip + omg);
+  }, [gateBottomEnabled, gateBottomSupportH, gateStripEnabled, gateStripH, gateOmegaEnabled, gateOmegaH]);
+
   const gateTotals = useMemo(() => {
     if (!gate) return null;
     const p = sum(gate.panels);
     const gsum = sum(gate.gaps);
-    const total = p + gsum + 2 * frameVert + gateBottomH; // + pas wsporników
+    const total = p + gsum + 2 * frameVert + gateExtraH;
     return { p, gsum, total };
-  }, [gate, frameVert, gateBottomH]);
+  }, [gate, frameVert, gateExtraH]);
 
   const wicketTotals = useMemo(() => {
     if (!wicket) return null;
     const p = sum(wicket.panels);
     const gsum = sum(wicket.gaps);
-    const total = p + gsum + 2 * frameVert; // furtka zawsze z ramą
+    const total = p + gsum + 2 * frameVert; // furtka bez przestrzeni 2 (na razie)
     return { p, gsum, total };
   }, [wicket, frameVert]);
 
-  // wzmocnienia pionowe dla bramy przesuwnej
+  // wzmocnienia pionowe dla przesuwnej
   const slidingVerticalBars = useMemo(() => {
     if (gateType !== "przesuwna") return [];
     const f = frameVert;
     const innerW = Math.max(0, gateWidth - 2 * f);
     if (innerW <= 0) return [];
-    if (gateWidth < 5000) return [f + innerW / 2 - f / 2];
+    if (gateWidth < 5000) {
+      return [f + innerW / 2 - f / 2];
+    }
     return [f + innerW / 3 - f / 2, f + (2 * innerW) / 3 - f / 2];
   }, [gateType, gateWidth, frameVert]);
 
-  // pozycje wsporników (przestrzeń 2)
+  // pozycje wsporników
   const gateBottomXs = useMemo(() => {
     if (gateType === "none" || !gateBottomEnabled) return [];
+
     const anchors: number[] = [];
     const f = frameVert;
+
     anchors.push(0);
     anchors.push(gateWidth - f);
+
     if (gateType === "przesuwna") {
       anchors.push(...slidingVerticalBars);
     } else if (gateType === "skrzydłowa") {
       anchors.push(gateWidth / 2 - f, gateWidth / 2);
     }
+
     const uniq = Array.from(new Set(anchors.map(a => Math.round(a * 1000) / 1000))).sort((a, b) => a - b);
+
     const out: number[] = [...uniq];
     if (gateBottomExtraPerSpan > 0) {
       for (let i = 0; i < uniq.length - 1; i++) {
-        const a = uniq[i], b = uniq[i + 1];
+        const a = uniq[i];
+        const b = uniq[i + 1];
         for (let k = 1; k <= gateBottomExtraPerSpan; k++) {
           const center = a + (b - a) * (k / (gateBottomExtraPerSpan + 1));
           out.push(center - f / 2);
@@ -338,23 +361,28 @@ export default function App() {
 
   function exportPNG(dpi = 300) {
     if (!svgRef.current) return;
+
     const svg = svgRef.current;
     const serializer = new XMLSerializer();
     const svgString = serializer.serializeToString(svg);
     const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(svgBlob);
+
     const img = new Image();
     img.onload = () => {
       const totalWidthMM = svg.width.baseVal.value / scale;
       const totalHeightMM = svg.height.baseVal.value / scale;
+
       const targetWpx = Math.round(totalWidthMM * MM_TO_IN * dpi);
       const targetHpx = Math.round(totalHeightMM * MM_TO_IN * dpi);
+
       const canvas = document.createElement("canvas");
       canvas.width = targetWpx;
       canvas.height = targetHpx;
       const ctx = canvas.getContext("2d")!;
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, targetWpx, targetHpx);
+
       ctx.setTransform(
         targetWpx / svg.width.baseVal.value,
         0,
@@ -365,6 +393,7 @@ export default function App() {
       );
       ctx.drawImage(img, 0, 0);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
+
       canvas.toBlob((blob) => {
         if (blob) downloadBlob(`projekt-ogrodzenia-${dpi}dpi.png`, blob);
         URL.revokeObjectURL(url);
@@ -390,9 +419,9 @@ export default function App() {
 
   const maxHeightMM = useMemo(() => {
     let h = spanHeight;
-    if (gateType !== "none") h = Math.max(h, gateHeight + gateBottomH, wicketHeight);
+    if (gateType !== "none") h = Math.max(h, gateHeight + gateExtraH, wicketHeight);
     return h + TOP_MARGIN_MM + 60;
-  }, [spanHeight, gateType, gateHeight, gateBottomH, wicketHeight]);
+  }, [spanHeight, gateType, gateHeight, wicketHeight, gateExtraH]);
 
   return (
     <div className="p-4 space-y-4">
@@ -633,7 +662,10 @@ export default function App() {
                 />
               </label>
 
-              <div className="mt-3 font-medium">Przestrzeń 2 – wsporniki (pod dolną ramą, wewnątrz)</div>
+              {/* PRZESTRZEŃ 2 */}
+              <div className="mt-3 font-medium">Przestrzeń 2 – elementy pod dolną ramą</div>
+
+              {/* Wsporniki */}
               <label className="flex items-center gap-2 mb-2">
                 <input
                   type="checkbox"
@@ -643,7 +675,7 @@ export default function App() {
                 <span>Włącz pas wsporników</span>
               </label>
               {gateBottomEnabled && (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2 mb-3">
                   <label className="block">
                     Wys. wspornika (mm)
                     <input
@@ -671,6 +703,77 @@ export default function App() {
                 </div>
               )}
 
+              {/* Pełny profil (strip) */}
+              <label className="flex items-center gap-2 mb-1">
+                <input
+                  type="checkbox"
+                  checked={gateStripEnabled}
+                  onChange={(e) => setGateStripEnabled(e.currentTarget.checked)}
+                />
+                <span>Pełny profil na całą długość</span>
+              </label>
+              {gateStripEnabled && (
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  <label className="block">
+                    Wysokość (mm)
+                    <input
+                      type="number"
+                      className="input"
+                      value={gateStripH}
+                      onChange={(e) => setGateStripH(e.currentTarget.valueAsNumber || 0)}
+                    />
+                  </label>
+                  <div className="col-span-2 text-xs text-gray-600 self-end">
+                    Rysowany tuż pod dolną ramą. Jeśli jest też omega, to omega idzie jeszcze niżej.
+                  </div>
+                </div>
+              )}
+
+              {/* Omega */}
+              <label className="flex items-center gap-2 mb-1">
+                <input
+                  type="checkbox"
+                  checked={gateOmegaEnabled}
+                  onChange={(e) => setGateOmegaEnabled(e.currentTarget.checked)}
+                />
+                <span>Omega (najniższy profil, może wystawać)</span>
+              </label>
+              {gateOmegaEnabled && (
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  <label className="block">
+                    Wysokość (mm)
+                    <input
+                      type="number"
+                      className="input"
+                      value={gateOmegaH}
+                      onChange={(e) => setGateOmegaH(e.currentTarget.valueAsNumber || 0)}
+                    />
+                  </label>
+                  <label className="block">
+                    Wysunięcie L (mm)
+                    <input
+                      type="number"
+                      className="input"
+                      value={gateOmegaOverL}
+                      onChange={(e) => setGateOmegaOverL(e.currentTarget.valueAsNumber || 0)}
+                    />
+                  </label>
+                  <label className="block">
+                    Wysunięcie P (mm)
+                    <input
+                      type="number"
+                      className="input"
+                      value={gateOmegaOverR}
+                      onChange={(e) => setGateOmegaOverR(e.currentTarget.valueAsNumber || 0)}
+                    />
+                  </label>
+                  <div className="text-xs text-gray-600 self-end">
+                    Przy skrzydłowej rysujemy osobno pod każdym skrzydłem (te same parametry).
+                  </div>
+                </div>
+              )}
+
+              {/* Dodatkowe panele – BRAMA */}
               <div className="mt-3 font-medium">Dodatkowe panele – tylko BRAMA</div>
               {gateExtraPanels.map((t, i) => (
                 <div key={i} className="flex gap-2 items-end">
@@ -722,6 +825,7 @@ export default function App() {
                 </div>
               )}
 
+              {/* Furtka */}
               <div className="mt-4 font-medium">Furtka (opcjonalnie)</div>
               <label className="block">
                 Szerokość furtki ({unit})
@@ -836,15 +940,16 @@ export default function App() {
               ) : (
                 <>
                   <div>Wysokość bramy (zadana): <b>{fmt2(gateHeight)} mm</b></div>
-                  <div>Wysokość całkowita bramy (z pasem): <b>{fmt2(gateHeight + gateBottomH)} mm</b></div>
+                  <div>Wysokość całkowita bramy (z Przestrzenią 2): <b>{fmt2(gateHeight + gateExtraH)} mm</b></div>
                   <div>
                     Składniki:&nbsp;
                     panele <b>{gateTotals ? fmt2(gateTotals.p) : 0}</b> +
                     przerwy <b>{gateTotals ? fmt2(gateTotals.gsum) : 0}</b> +
                     rama <b>{2 * frameVert}</b>
+                    {gateExtraH > 0 ? <> + A <b>{fmt2(gateExtraH)}</b></> : null}
                     &nbsp;= <b>{gateTotals ? fmt2(gateTotals.total) : 0} mm</b>
-                    {gateTotals && Math.abs(gateTotals.total - (gateHeight + gateBottomH)) > 0 ? (
-                      <span className="text-red-600"> (≠ {fmt2(gateHeight + gateBottomH)} mm)</span>
+                    {gateTotals && Math.abs(gateTotals.total - (gateHeight + gateExtraH)) > 0 ? (
+                      <span className="text-red-600"> (≠ {fmt2(gateHeight + gateExtraH)} mm)</span>
                     ) : null}
                   </div>
                 </>
@@ -919,7 +1024,7 @@ export default function App() {
             </marker>
           </defs>
 
-          {/* NAGŁÓWEK + PODSUMOWANIE w SVG */}
+          {/* NAGŁÓWEK */}
           <g>
             <text x={10} y={12} fontSize={12} fontWeight={600}>
               Nr zlecenia/oferty: {orderNo || "-"}
@@ -930,7 +1035,7 @@ export default function App() {
             {[
               `Przęsło – panele: ${fmt2(sumPanels)}; przerwy: ${fmt2(sumSpanGaps)}; rama: ${hasFrame ? 2 * frameVert : 0}; suma: ${fmt2(spanTotalByParts)} (zadane: ${fmt2(spanHeight)})`,
               gate && gateTotals
-                ? `Brama – panele: ${fmt2(gateTotals.p)}; przerwy: ${fmt2(gateTotals.gsum)}; rama: ${2 * frameVert}; suma: ${fmt2(gateTotals.total)} (zadane: ${fmt2(gateHeight + gateBottomH)})`
+                ? `Brama – panele: ${fmt2(gateTotals.p)}; przerwy: ${fmt2(gateTotals.gsum)}; rama: ${2 * frameVert}; A: ${fmt2(gateExtraH)}; suma: ${fmt2(gateTotals.total)} (zadane: ${fmt2(gateHeight + gateExtraH)})`
                 : null,
               wicket && wicketTotals
                 ? `Furtka – panele: ${fmt2(wicketTotals.p)}; przerwy: ${fmt2(wicketTotals.gsum)}; rama: ${2 * frameVert}; suma: ${fmt2(wicketTotals.total)} (zadane: ${fmt2(wicketHeight)})`
@@ -949,6 +1054,7 @@ export default function App() {
             const yOffset = TOP_MARGIN_MM * scale;
             const xSpan = 10 * scale;
             if (baseError || spanGapError) return null;
+
             return (
               <g transform={`translate(${xSpan}, ${yOffset})`}>
                 <LayoutBlock
@@ -973,8 +1079,12 @@ export default function App() {
             const xGate = (10 + spanWidth + LABEL_COL_MM + MODULE_GUTTER_MM) * scale;
 
             const bottomSupports =
-              gateBottomEnabled
-                ? { height: gateBottomSupportH, xs: gateBottomXs }
+              gateBottomEnabled ? { height: gateBottomSupportH, xs: gateBottomXs } : undefined;
+            const bottomStrip =
+              gateStripEnabled && gateStripH > 0 ? { height: gateStripH } : undefined;
+            const omega =
+              gateOmegaEnabled && gateOmegaH > 0
+                ? { height: gateOmegaH, overhangL: gateOmegaOverL, overhangR: gateOmegaOverR }
                 : undefined;
 
             const gateBlock = gate ? (
@@ -990,6 +1100,8 @@ export default function App() {
                     scale={scale}
                     frameVert={frameVert}
                     bottomSupports={bottomSupports}
+                    bottomStrip={bottomStrip}
+                    omega={omega}
                   />
                   <g transform={`translate(${(gateWidth / 2 + 10) * scale}, 0)`}>
                     <LayoutBlock
@@ -1002,6 +1114,8 @@ export default function App() {
                       scale={scale}
                       frameVert={frameVert}
                       bottomSupports={bottomSupports}
+                      bottomStrip={bottomStrip}
+                      omega={omega}
                     />
                   </g>
                 </g>
@@ -1018,6 +1132,8 @@ export default function App() {
                     frameVert={frameVert}
                     verticalBars={slidingVerticalBars}
                     bottomSupports={bottomSupports}
+                    bottomStrip={bottomStrip}
+                    omega={omega}
                   />
                 </g>
               )
@@ -1046,7 +1162,7 @@ export default function App() {
               </g>
             ) : null;
 
-            // Δ wysokości względem przęsła (całkowite)
+            // Δ wysokości względem przęsła
             const xDeltaGate = (10 + spanWidth + LABEL_COL_MM + MODULE_GUTTER_MM / 2) * scale;
             const xDeltaWicket =
               (10 + spanWidth + LABEL_COL_MM + MODULE_GUTTER_MM + gateWidthWithLabels + MODULE_GUTTER_MM / 2) * scale;
@@ -1062,7 +1178,7 @@ export default function App() {
                       x1={xDeltaGate}
                       x2={xDeltaGate}
                       y1={(TOP_MARGIN_MM + spanHeight) * scale}
-                      y2={(TOP_MARGIN_MM + (gateHeight + gateBottomH)) * scale}
+                      y2={(TOP_MARGIN_MM + (gateHeight + gateExtraH)) * scale}
                       stroke="#333"
                       markerStart="url(#arrowhead)"
                       markerEnd="url(#arrowhead)"
@@ -1070,15 +1186,11 @@ export default function App() {
                     />
                     <text
                       x={xDeltaGate + 3}
-                      y={(
-                        TOP_MARGIN_MM +
-                        Math.min(gateHeight + gateBottomH, spanHeight) +
-                        Math.abs(gateHeight + gateBottomH - spanHeight) / 2
-                      ) * scale}
+                      y={(TOP_MARGIN_MM + Math.min(gateHeight + gateExtraH, spanHeight) + Math.abs(gateHeight + gateExtraH - spanHeight) / 2) * scale}
                       fontSize={12}
                       style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
                     >
-                      {`Δ: ${Math.abs(gateHeight + gateBottomH - spanHeight)} mm`}
+                      {`Δ: ${Math.abs(gateHeight + gateExtraH - spanHeight)} mm`}
                     </text>
                   </g>
                 )}
@@ -1097,11 +1209,7 @@ export default function App() {
                     />
                     <text
                       x={xDeltaWicket + 3}
-                      y={(
-                        TOP_MARGIN_MM +
-                        Math.min(wicketHeight, spanHeight) +
-                        Math.abs(wicketHeight - spanHeight) / 2
-                      ) * scale}
+                      y={(TOP_MARGIN_MM + Math.min(wicketHeight, spanHeight) + Math.abs(wicketHeight - spanHeight) / 2) * scale}
                       fontSize={12}
                       style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
                     >
@@ -1116,8 +1224,7 @@ export default function App() {
       </div>
 
       <div className="text-xs text-gray-500">
-        * Zaokrąglanie do 0,01 mm. Panele są wyrównane pionowo między elementami. Brama skrzydłowa rysowana jako dwa równe skrzydła; brama przesuwna ma pionowe wzmocnienia zależnie od szerokości. „Przestrzeń 2”
-        (wsporniki) jest rysowana wewnątrz modułu, tuż nad dolną ramą, i jest wliczana do wysokości całkowitej bramy.
+        * Zaokrąglanie do 0,01 mm. Panele są wyrównane pionowo między elementami. Brama skrzydłowa rysowana jako dwa równe skrzydła; brama przesuwna ma pionowe wzmocnienia zależnie od szerokości. Przestrzeń 2 obsługuje wsporniki, pełny profil oraz omegę (może wystawać).
       </div>
     </div>
   );
