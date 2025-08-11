@@ -46,6 +46,8 @@ export default function App() {
   const [gateType, setGateType] = useState<GateType>("none");
   const [gateWidth, setGateWidth] = useState<number>(4000);
   const [gateHeight, setGateHeight] = useState<number>(1400);
+  const gateExtraH = gateBottomEnabled ? gateBottomSupportH : 0;
+
 
   // przestrzeń 2 (wsporniki pod dolną ramą – wewnątrz modułu)
   const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
