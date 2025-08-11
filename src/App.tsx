@@ -25,9 +25,17 @@ const unitFactorToMM: Record<Unit, number> = { mm: 1, cm: 10, in: 25.4 };
 const toMM = (v: number, unit: Unit) => v * unitFactorToMM[unit];
 const fromMM = (vmm: number, unit: Unit) => vmm / unitFactorToMM[unit];
 // 0.01 mm
-const round2 = (n: number) => fmt2(n * 100) / 100;
-// do wyświetlania
-const fmt2 = (n: number) => n.toFixed(2);
+// --- helpers dokładność 0.01 mm ---
+const round2 = (n: number): number =>
+  Math.round((n + Number.EPSILON) * 100) / 100;
+
+const fmt2 = (n: number): string => round2(n).toFixed(2);
+
+const toNum = (v: unknown): number =>
+  typeof v === "number" ? v : Number(v) || 0;
+
+// alias dla wstecznej kompatybilności
+const roundMM = round2;
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 const parseNumber = (raw: string) => {
   if (raw.trim() === "") return NaN;
