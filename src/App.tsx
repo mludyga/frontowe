@@ -9,7 +9,6 @@ type GateType = "none" | "skrzydłowa" | "przesuwna";
 type CustomGap = { value: number | null; locked: boolean };
 type GateLayout = { panels: number[]; gaps: number[]; error?: string };
 
-// — helpers —
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 const parseNumber = (raw: string) => {
   if (raw.trim() === "") return NaN;
@@ -24,7 +23,6 @@ function distributeAutoGaps(leftover: number, autos: number, weights?: number[])
   return weights.map((w) => (w / wsum) * leftover);
 }
 
-// — layout constants —
 const MODULE_GUTTER_MM = 180;
 const TOP_MARGIN_MM = 446;
 
@@ -32,45 +30,50 @@ export default function App() {
   const [unit, setUnit] = useState<Unit>("mm");
 
   // PRZĘSŁO
-  const [spanWidth, setSpanWidth] = useState<number>(2000);
-  const [spanHeight, setSpanHeight] = useState<number>(1200);
-  const [hasFrame, setHasFrame] = useState<boolean>(false);
-  const [frameVert, setFrameVert] = useState<number>(60);
+  const [spanWidth, setSpanWidth] = useState(2000);
+  const [spanHeight, setSpanHeight] = useState(1200);
+  const [hasFrame, setHasFrame] = useState(false);
+  const [frameVert, setFrameVert] = useState(60);
 
-  // Grupy paneli
   const [groups, setGroups] = useState<PanelGroup[]>([{ qty: 6, t: 100, inGate: true }]);
   const [gapMode, setGapMode] = useState<GapMode>("equal");
-  const [weightedAuto, setWeightedAuto] = useState<boolean>(false);
+  const [weightedAuto, setWeightedAuto] = useState(false);
   const [customGaps, setCustomGaps] = useState<CustomGap[]>([]);
 
   // BRAMA / FURTKA
   const [gateType, setGateType] = useState<GateType>("none");
-  const [gateWidth, setGateWidth] = useState<number>(4000);
-  const [gateHeight, setGateHeight] = useState<number>(1400);
+  const [gateWidth, setGateWidth] = useState(4000);
+  const [gateHeight, setGateHeight] = useState(1400);
 
   // Przestrzeń 2 – wsporniki
-  const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
-  const [gateBottomSupportH, setGateBottomSupportH] = useState<number>(80);
-  const [gateBottomExtraPerSpan, setGateBottomExtraPerSpan] = useState<number>(0);
+  const [gateBottomEnabled, setGateBottomEnabled] = useState(false);
+  const [gateBottomSupportH, setGateBottomSupportH] = useState(80);
+  const [gateBottomExtraPerSpan, setGateBottomExtraPerSpan] = useState(0);
 
-  // Przestrzeń 2 – OMEGA / dolny profil (DOMYŚLNIE WŁĄCZONA 80 mm)
-  const [gateOmegaEnabled, setGateOmegaEnabled] = useState<boolean>(true);
-  const [gateOmegaH, setGateOmegaH] = useState<number>(80);
+  // Dodatkowy profil (nad omegą)
+  const [gateBottomProfileEnabled, setGateBottomProfileEnabled] = useState(false);
+  const [gateBottomProfileH, setGateBottomProfileH] = useState(40);
 
-  const [wicketWidth, setWicketWidth] = useState<number>(1000);
-  const [wicketHeight, setWicketHeight] = useState<number>(1400);
+  // Omega (najniżej)
+  const [gateOmegaEnabled, setGateOmegaEnabled] = useState(true);
+  const [gateOmegaH, setGateOmegaH] = useState(80);
+  const [gateOmegaOverhangL, setGateOmegaOverhangL] = useState(0);
+  const [gateOmegaOverhangR, setGateOmegaOverhangR] = useState(0);
 
-  // Dodatkowe panele
+  // Furtka
+  const [wicketWidth, setWicketWidth] = useState(1000);
+  const [wicketHeight, setWicketHeight] = useState(1400);
+
+  // dodatkowe panele
   const [gateExtraPanels, setGateExtraPanels] = useState<number[]>([]);
-  const [gateGapAfterBase, setGateGapAfterBase] = useState<number>(0);
-  const [gateGapBetweenExtras, setGateGapBetweenExtras] = useState<number>(0);
+  const [gateGapAfterBase, setGateGapAfterBase] = useState(0);
+  const [gateGapBetweenExtras, setGateGapBetweenExtras] = useState(0);
   const [wicketExtraPanels, setWicketExtraPanels] = useState<number[]>([]);
-  const [wicketGapAfterBase, setWicketGapAfterBase] = useState<number>(0);
-  const [wicketGapBetweenExtras, setWicketGapBetweenExtras] = useState<number>(0);
+  const [wicketGapAfterBase, setWicketGapAfterBase] = useState(0);
+  const [wicketGapBetweenExtras, setWicketGapBetweenExtras] = useState(0);
 
-  // UX
-  const [orderNo, setOrderNo] = useState<string>("");
-  const [scale, setScale] = useState<number>(0.2);
+  const [orderNo, setOrderNo] = useState("");
+  const [scale, setScale] = useState(0.2);
 
   // listy paneli
   const panelList = useMemo(() => {
@@ -100,7 +103,6 @@ export default function App() {
   const nPanels = panelList.length;
   const sumPanels = useMemo(() => sum(panelList), [panelList]);
 
-  // wysokość wewnętrzna przęsła
   const spanInternalHeight = useMemo(
     () => (hasFrame ? Math.max(0, spanHeight - 2 * frameVert) : spanHeight),
     [hasFrame, spanHeight, frameVert]
@@ -117,7 +119,6 @@ export default function App() {
     return null;
   }, [nPanels, sumPanels, spanInternalHeight]);
 
-  // zsynchronizuj customGaps
   useEffect(() => {
     setCustomGaps((prev) => {
       const expected = gapCountSpan;
@@ -170,13 +171,11 @@ export default function App() {
   const spanGaps = spanCalc.gaps;
   const spanGapError = spanCalc.error;
 
-  // przerwy środkowe przęsła
   const spanMidGaps = useMemo(() => {
     const countMid = Math.max(0, nPanels - 1);
     return hasFrame ? spanGaps.slice(1, 1 + countMid) : spanGaps.slice(0, countMid);
   }, [hasFrame, spanGaps, nPanels]);
 
-  // przerwy środkowe do bramy/furtki (z maską include)
   const baseMidGapsGate = useMemo(() => {
     const mids: number[] = [];
     for (let i = 0; i < Math.max(0, nPanels - 1); i++) {
@@ -186,14 +185,12 @@ export default function App() {
     return mids;
   }, [includeMask, nPanels, spanMidGaps]);
 
-  // górna przerwa bramy/furtki
   const typicalSpanMid = spanMidGaps[0] ?? 0;
   const topGapForGateValue = useMemo(
     () => (hasFrame ? (spanGaps[0] ?? 0) : typicalSpanMid),
     [hasFrame, spanGaps, typicalSpanMid]
   );
 
-  // układ bramy/furtki
   function computeGateLayout(
     height: number,
     basePanels: number[],
@@ -253,26 +250,31 @@ export default function App() {
     );
   }, [gateType, wicketHeight, panelsForGate, baseMidGapsGate, topGapForGateValue, wicketExtraPanels, wicketGapAfterBase, wicketGapBetweenExtras]);
 
-  // sumy
   const sumSpanGaps = useMemo(() => sum(spanGaps), [spanGaps]);
   const spanTotalByParts = useMemo(
     () => sumPanels + sumSpanGaps + (hasFrame ? 2 * frameVert : 0),
     [sumPanels, sumSpanGaps, hasFrame, frameVert]
   );
 
-  // Wysokość dodatkowa w bramie: wsporniki + omega
+  // dodatki pod bramą / furtką
   const gateExtraH = useMemo(
     () =>
       (gateBottomEnabled ? gateBottomSupportH : 0) +
+      (gateBottomProfileEnabled ? gateBottomProfileH : 0) +
       (gateOmegaEnabled ? gateOmegaH : 0),
-    [gateBottomEnabled, gateBottomSupportH, gateOmegaEnabled, gateOmegaH]
+    [gateBottomEnabled, gateBottomSupportH, gateBottomProfileEnabled, gateBottomProfileH, gateOmegaEnabled, gateOmegaH]
+  );
+
+  const wicketExtraH = useMemo(
+    () => (gateBottomProfileEnabled ? gateBottomProfileH : 0) + (gateOmegaEnabled ? gateOmegaH : 0),
+    [gateBottomProfileEnabled, gateBottomProfileH, gateOmegaEnabled, gateOmegaH]
   );
 
   const gateTotals = useMemo(() => {
     if (!gate) return null;
     const p = sum(gate.panels);
     const gsum = sum(gate.gaps);
-    const total = p + gsum + 2 * frameVert + gateExtraH; // rama + dodatkowe pod spodem
+    const total = p + gsum + 2 * frameVert + gateExtraH;
     return { p, gsum, total };
   }, [gate, frameVert, gateExtraH]);
 
@@ -280,28 +282,25 @@ export default function App() {
     if (!wicket) return null;
     const p = sum(wicket.panels);
     const gsum = sum(wicket.gaps);
-    const total = p + gsum + 2 * frameVert + (gateOmegaEnabled ? gateOmegaH : 0); // opcjonalnie też liczymy omegę pod furtką
+    const total = p + gsum + 2 * frameVert + wicketExtraH;
     return { p, gsum, total };
-  }, [wicket, frameVert, gateOmegaEnabled, gateOmegaH]);
+  }, [wicket, frameVert, wicketExtraH]);
 
-  // pionowe wzmocnienia dla przesuwnej
+  // pionowe wzmocnienia przesuwnej
   const slidingVerticalBars = useMemo(() => {
     if (gateType !== "przesuwna") return [];
     const f = frameVert;
     const innerW = Math.max(0, gateWidth - 2 * f);
     if (innerW <= 0) return [];
-    if (gateWidth < 5000) {
-      return [f + innerW / 2 - f / 2];
-    }
+    if (gateWidth < 5000) return [f + innerW / 2 - f / 2];
     return [f + innerW / 3 - f / 2, f + (2 * innerW) / 3 - f / 2];
   }, [gateType, gateWidth, frameVert]);
 
   // pozycje wsporników
   const gateBottomXs = useMemo(() => {
     if (gateType === "none" || !gateBottomEnabled) return [];
-    const anchors: number[] = [];
     const f = frameVert;
-    anchors.push(0, gateWidth - f);
+    const anchors: number[] = [0, gateWidth - f];
     if (gateType === "przesuwna") anchors.push(...slidingVerticalBars);
     else if (gateType === "skrzydłowa") anchors.push(gateWidth / 2 - f, gateWidth / 2);
     const uniq = Array.from(new Set(anchors.map(a => Math.round(a * 1000) / 1000))).sort((a, b) => a - b);
@@ -318,7 +317,7 @@ export default function App() {
     return out.sort((a, b) => a - b);
   }, [gateType, gateWidth, frameVert, slidingVerticalBars, gateBottomEnabled, gateBottomExtraPerSpan]);
 
-  // eksporty
+  // eksport
   const svgRef = useRef<SVGSVGElement | null>(null);
   const MM_TO_IN = 1 / 25.4;
 
@@ -332,80 +331,83 @@ export default function App() {
     a.remove();
     URL.revokeObjectURL(url);
   }
-
   function exportSVG() {
     if (!svgRef.current) return;
-    const node = svgRef.current.cloneNode(true) as SVGSVGElement;
-    const xml = new XMLSerializer().serializeToString(node);
-    const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
-    downloadBlob("projekt-ogrodzenia.svg", blob);
+    const xml = new XMLSerializer().serializeToString(svgRef.current.cloneNode(true) as SVGSVGElement);
+    downloadBlob("projekt-ogrodzenia.svg", new Blob([xml], { type: "image/svg+xml;charset=utf-8" }));
   }
-
   function exportPNG(dpi = 300) {
     if (!svgRef.current) return;
     const svg = svgRef.current;
-    const serializer = new XMLSerializer();
-    const svgString = serializer.serializeToString(svg);
-    const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(svgBlob);
-
+    const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml;charset=utf-8" }));
     const img = new Image();
     img.onload = () => {
       const totalWidthMM = svg.width.baseVal.value / scale;
       const totalHeightMM = svg.height.baseVal.value / scale;
       const targetWpx = Math.round(totalWidthMM * MM_TO_IN * dpi);
       const targetHpx = Math.round(totalHeightMM * MM_TO_IN * dpi);
-
       const canvas = document.createElement("canvas");
-      canvas.width = targetWpx;
-      canvas.height = targetHpx;
+      canvas.width = targetWpx; canvas.height = targetHpx;
       const ctx = canvas.getContext("2d")!;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, targetWpx, targetHpx);
-
-      ctx.setTransform(
-        targetWpx / svg.width.baseVal.value,
-        0, 0,
-        targetHpx / svg.height.baseVal.value,
-        0, 0
-      );
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, targetWpx, targetHpx);
+      ctx.setTransform(targetWpx / svg.width.baseVal.value, 0, 0, targetHpx / svg.height.baseVal.value, 0, 0);
       ctx.drawImage(img, 0, 0);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-      canvas.toBlob((blob) => {
-        if (blob) downloadBlob(`projekt-ogrodzenia-${dpi}dpi.png`, blob);
-        URL.revokeObjectURL(url);
-      }, "image/png");
+      canvas.toBlob((b) => { if (b) downloadBlob(`projekt-ogrodzenia-${dpi}dpi.png`, b); URL.revokeObjectURL(url); }, "image/png");
     };
     img.onerror = () => URL.revokeObjectURL(url);
     img.src = url;
   }
 
+  // omega / profil config (wspólne dla bramy i furtki)
+  const omegaCfg = useMemo(
+    () => (gateOmegaEnabled ? { height: gateOmegaH, overhangL: gateOmegaOverhangL, overhangR: gateOmegaOverhangR } : undefined),
+    [gateOmegaEnabled, gateOmegaH, gateOmegaOverhangL, gateOmegaOverhangR]
+  );
+  const profileCfg = useMemo(
+    () => (gateBottomProfileEnabled ? { height: gateBottomProfileH } : undefined),
+    [gateBottomProfileEnabled, gateBottomProfileH]
+  );
+
   // rozmiary całego rysunku
   const totalWidthMM = useMemo(() => {
     let w = 0;
+    const ol = omegaCfg?.overhangL ?? 0;
+    const or = omegaCfg?.overhangR ?? 0;
+
     w += spanWidth + LABEL_COL_MM;
+
     if (gateType !== "none") {
-      w += MODULE_GUTTER_MM;
-      if (gateType === "skrzydłowa") w += gateWidth + 2 * LABEL_COL_MM + 10;
-      else w += gateWidth + LABEL_COL_MM;
-      w += MODULE_GUTTER_MM;
+      // przejście SPAN -> GATE (dołóż wysięg lewy)
+      w += MODULE_GUTTER_MM + ol;
+
+      const gateWidthWithLabels =
+        gateType === "skrzydłowa"
+          ? gateWidth + 2 * LABEL_COL_MM + 10
+          : gateWidth + LABEL_COL_MM;
+
+      // sam blok bramy
+      w += gateWidthWithLabels;
+
+      // wysięg prawy + przejście do furtki + wysięg lewy furtki
+      w += or + MODULE_GUTTER_MM + ol;
+
+      // furtka + etykiety
       w += wicketWidth + LABEL_COL_MM;
+
+      // wysięg prawy furtki
+      w += or;
     }
     return w + 60;
-  }, [spanWidth, gateType, gateWidth, wicketWidth]);
+  }, [spanWidth, gateType, gateWidth, wicketWidth, omegaCfg]);
 
   const maxHeightMM = useMemo(() => {
     let h = spanHeight;
-    if (gateType !== "none") h = Math.max(h, gateHeight + gateExtraH, wicketHeight + (gateOmegaEnabled ? gateOmegaH : 0));
+    if (gateType !== "none") {
+      h = Math.max(h, gateHeight + gateExtraH, wicketHeight + wicketExtraH);
+    }
     return h + TOP_MARGIN_MM + 60;
-  }, [spanHeight, gateType, gateHeight, wicketHeight, gateExtraH, gateOmegaEnabled, gateOmegaH]);
-
-  // konfiguracja omegi do przekazania niżej (na razie bez wysięgów)
-  const omegaCfg = useMemo(
-    () => (gateOmegaEnabled ? { height: gateOmegaH, overhangL: 0, overhangR: 0 } : undefined),
-    [gateOmegaEnabled, gateOmegaH]
-  );
+  }, [spanHeight, gateType, gateHeight, wicketHeight, gateExtraH, wicketExtraH]);
 
   return (
     <div className="p-4 space-y-4">
@@ -417,32 +419,16 @@ export default function App() {
           <div className="font-semibold">Jednostki</div>
           <div className="flex gap-2">
             {(["mm", "cm", "in"] as Unit[]).map((u) => (
-              <button
-                key={u}
-                onClick={() => setUnit(u)}
-                className={`px-3 py-1 rounded border ${unit === u ? "bg-black text-white" : ""}`}
-              >
-                {u}
-              </button>
+              <button key={u} onClick={() => setUnit(u)} className={`px-3 py-1 rounded border ${unit === u ? "bg-black text-white" : ""}`}>{u}</button>
             ))}
           </div>
 
           <div className="mt-4 font-semibold">Przęsło</div>
           <label className="block">Szerokość ({unit})
-            <input
-              type="number"
-              className="input"
-              value={fromMM(spanWidth, unit)}
-              onChange={(e) => setSpanWidth(toMM(e.currentTarget.valueAsNumber || 0, unit))}
-            />
+            <input type="number" className="input" value={fromMM(spanWidth, unit)} onChange={(e) => setSpanWidth(toMM(e.currentTarget.valueAsNumber || 0, unit))} />
           </label>
           <label className="block">Wysokość ({unit})
-            <input
-              type="number"
-              className="input"
-              value={fromMM(spanHeight, unit)}
-              onChange={(e) => setSpanHeight(toMM(e.currentTarget.valueAsNumber || 0, unit))}
-            />
+            <input type="number" className="input" value={fromMM(spanHeight, unit)} onChange={(e) => setSpanHeight(toMM(e.currentTarget.valueAsNumber || 0, unit))} />
           </label>
 
           <label className="flex items-center gap-2 mt-2">
@@ -452,12 +438,7 @@ export default function App() {
           {hasFrame && (
             <div className="grid grid-cols-2 gap-2">
               <label className="block">Grubość ramy (mm)
-                <input
-                  type="number"
-                  className="input"
-                  value={frameVert}
-                  onChange={(e) => setFrameVert(e.currentTarget.valueAsNumber || 0)}
-                />
+                <input type="number" className="input" value={frameVert} onChange={(e) => setFrameVert(e.currentTarget.valueAsNumber || 0)} />
               </label>
               <div />
             </div>
@@ -468,94 +449,45 @@ export default function App() {
             {groups.map((g, idx) => (
               <div key={idx} className="grid grid-cols-3 gap-2 items-end">
                 <label className="block">Ilość
-                  <input
-                    type="number"
-                    className="input"
-                    value={g.qty}
-                    min={1}
-                    onChange={(e) => {
-                      const v = e.currentTarget.valueAsNumber || 0;
-                      const next = [...groups];
-                      next[idx] = { ...g, qty: v };
-                      setGroups(next);
-                    }}
-                  />
+                  <input type="number" className="input" value={g.qty} min={1} onChange={(e) => {
+                    const v = e.currentTarget.valueAsNumber || 0; const next = [...groups]; next[idx] = { ...g, qty: v }; setGroups(next);
+                  }} />
                 </label>
                 <label className="block">Wys. panelu (mm)
-                  <input
-                    type="number"
-                    className="input"
-                    value={g.t}
-                    min={1}
-                    onChange={(e) => {
-                      const v = e.currentTarget.valueAsNumber || 0;
-                      const next = [...groups];
-                      next[idx] = { ...g, t: v };
-                      setGroups(next);
-                    }}
-                  />
+                  <input type="number" className="input" value={g.t} min={1} onChange={(e) => {
+                    const v = e.currentTarget.valueAsNumber || 0; const next = [...groups]; next[idx] = { ...g, t: v }; setGroups(next);
+                  }} />
                 </label>
                 <div className="flex gap-2 items-center">
                   <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={g.inGate === false}
-                      onChange={(e) => {
-                        const next = [...groups];
-                        next[idx] = { ...g, inGate: !e.currentTarget.checked };
-                        setGroups(next);
-                      }}
-                    />
+                    <input type="checkbox" checked={g.inGate === false} onChange={(e) => {
+                      const next = [...groups]; next[idx] = { ...g, inGate: !e.currentTarget.checked }; setGroups(next);
+                    }} />
                     <span>Nie stosuj w bramie i furtce</span>
                   </label>
-                  <button className="px-2 py-1 border rounded" onClick={() => setGroups(groups.filter((_, i) => i !== idx))}>
-                    Usuń
-                  </button>
+                  <button className="px-2 py-1 border rounded" onClick={() => setGroups(groups.filter((_, i) => i !== idx))}>Usuń</button>
                 </div>
               </div>
             ))}
-            <button className="px-3 py-1 border rounded" onClick={() => setGroups([...groups, { qty: 1, t: 100, inGate: true }])}>
-              + Dodaj grupę
-            </button>
-            <div className="text-sm text-gray-600">
-              Presety:{" "}
-              {[20, 40, 60, 80, 100, 120, 160, 180, 200].map((p) => (
-                <button key={p} className="underline mr-2" onClick={() => setGroups([...groups, { qty: 1, t: p, inGate: true }])}>
-                  {p}×20
-                </button>
-              ))}
-            </div>
+            <button className="px-3 py-1 border rounded" onClick={() => setGroups([...groups, { qty: 1, t: 100, inGate: true }])}>+ Dodaj grupę</button>
           </div>
 
           <div className="mt-4 font-semibold">Przerwy</div>
           <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2">
-              <input type="radio" name="gap" checked={gapMode === "equal"} onChange={() => setGapMode("equal")} /> Równe
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="radio" name="gap" checked={gapMode === "custom"} onChange={() => setGapMode("custom")} /> Niestandardowe
-            </label>
+            <label className="flex items-center gap-2"><input type="radio" name="gap" checked={gapMode === "equal"} onChange={() => setGapMode("equal")} /> Równe</label>
+            <label className="flex items-center gap-2"><input type="radio" name="gap" checked={gapMode === "custom"} onChange={() => setGapMode("custom")} /> Niestandardowe</label>
           </div>
           {gapMode === "custom" && (
             <div className="space-y-2">
-              <label className="flex items-center gap-2">
-                <input type="checkbox" checked={weightedAuto} onChange={(e) => setWeightedAuto(e.currentTarget.checked)} /> Rozkładaj AUTO proporcjonalnie do szerokości paneli
-              </label>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={weightedAuto} onChange={(e) => setWeightedAuto(e.currentTarget.checked)} /> Rozkładaj AUTO proporcjonalnie do szerokości paneli</label>
               <div className="text-sm text-gray-600">Długość wektora przerw: {gapCountSpan}. Pozostaw puste = AUTO.</div>
               <div className="grid grid-cols-4 gap-2">
                 {Array.from({ length: gapCountSpan }).map((_, i) => (
-                  <input
-                    key={i}
-                    placeholder={`g${i + 1} (mm)`}
-                    className="input"
+                  <input key={i} placeholder={`g${i + 1} (mm)`} className="input"
                     value={customGaps[i]?.value ?? ""}
                     onChange={(e) => {
                       const v = parseNumber(e.currentTarget.value);
-                      setCustomGaps((prev) => {
-                        const next = [...prev];
-                        next[i] = { value: isNaN(v) ? null : v, locked: !isNaN(v) };
-                        return next;
-                      });
+                      setCustomGaps((prev) => { const next = [...prev]; next[i] = { value: isNaN(v) ? null : v, locked: !isNaN(v) }; return next; });
                     }}
                   />
                 ))}
@@ -577,14 +509,14 @@ export default function App() {
             <div>
               <label className="block">Szerokość bramy ({unit})
                 <input type="number" className="input" value={fromMM(gateWidth, unit)} onChange={(e) => setGateWidth(toMM(e.currentTarget.valueAsNumber || 0, unit))} />
-                {gateType === "skrzydłowa" && <div className="text-xs text-gray-600">Rysujemy 2 równe skrzydła po {fmt2(gateWidth / 2)} mm.</div>}
+                {gateType === "skrzydłowa" && <div className="text-xs text-gray-600">2 równe skrzydła po {fmt2(gateWidth / 2)} mm.</div>}
               </label>
               <label className="block">Wysokość bramy ({unit})
                 <input type="number" className="input" value={fromMM(gateHeight, unit)} onChange={(e) => setGateHeight(toMM(e.currentTarget.valueAsNumber || 0, unit))} />
               </label>
 
-              {/* Przestrzeń 2 – wsporniki */}
-              <div className="mt-3 font-medium">Przestrzeń 2 – wsporniki (pod dolną ramą)</div>
+              {/* wsporniki */}
+              <div className="mt-3 font-medium">Przestrzeń 2 – wsporniki</div>
               <label className="flex items-center gap-2 mb-2">
                 <input type="checkbox" checked={gateBottomEnabled} onChange={(e) => setGateBottomEnabled(e.currentTarget.checked)} />
                 <span>Włącz pas wsporników</span>
@@ -597,33 +529,53 @@ export default function App() {
                   <label className="block">Dodatkowe / przerwa
                     <input type="number" className="input" min={0} value={gateBottomExtraPerSpan} onChange={(e) => setGateBottomExtraPerSpan(Math.max(0, e.currentTarget.valueAsNumber || 0))} />
                   </label>
-                  <div className="text-xs text-gray-600 self-end">Kotwy: lewy/prawy bok + środek(y). Dodatkowe rozmieszczane równo.</div>
+                  <div className="text-xs text-gray-600 self-end">Kotwy: boki ramy + wzmocnienia. Dodatkowe równomiernie.</div>
                 </div>
               )}
 
-              {/* Omega / dolny profil */}
-              <div className="mt-3 font-medium">Dolny profil (omega)</div>
+              {/* profil */}
+              <div className="mt-3 font-medium">Profil pod ramą (na całą długość)</div>
               <label className="flex items-center gap-2 mb-2">
-                <input type="checkbox" checked={gateOmegaEnabled} onChange={(e) => setGateOmegaEnabled(e.currentTarget.checked)} />
-                <span>Dodaj omegę / profil pod wspornikami</span>
+                <input type="checkbox" checked={gateBottomProfileEnabled} onChange={(e) => setGateBottomProfileEnabled(e.currentTarget.checked)} />
+                <span>Dodaj profil (nad omegą)</span>
               </label>
-              {gateOmegaEnabled && (
+              {gateBottomProfileEnabled && (
                 <div className="grid grid-cols-3 gap-2">
                   <label className="block">Wysokość (mm)
-                    <input type="number" className="input" value={gateOmegaH} onChange={(e) => setGateOmegaH(e.currentTarget.valueAsNumber || 0)} />
+                    <input type="number" className="input" value={gateBottomProfileH} onChange={(e) => setGateBottomProfileH(e.currentTarget.valueAsNumber || 0)} />
                   </label>
-                  <div className="text-xs text-gray-600 self-end col-span-2">Wliczana do wysokości całkowitej. Rysowana pod wspornikami.</div>
+                  <div className="col-span-2 text-xs text-gray-600 self-end">Wliczany do wysokości całkowitej.</div>
                 </div>
               )}
 
-              {/* Dodatkowe panele – brama */}
-              <div className="mt-3 font-medium">Dodatkowe panele – tylko BRAMA</div>
+              {/* omega */}
+              <div className="mt-3 font-medium">Omega (najniżej)</div>
+              <label className="flex items-center gap-2 mb-2">
+                <input type="checkbox" checked={gateOmegaEnabled} onChange={(e) => setGateOmegaEnabled(e.currentTarget.checked)} />
+                <span>Dodaj omegę pod profilem</span>
+              </label>
+              {gateOmegaEnabled && (
+                <div className="grid grid-cols-4 gap-2">
+                  <label className="block col-span-1">Wysokość (mm)
+                    <input type="number" className="input" value={gateOmegaH} onChange={(e) => setGateOmegaH(e.currentTarget.valueAsNumber || 0)} />
+                  </label>
+                  <label className="block col-span-1">Wysięg L (mm)
+                    <input type="number" className="input" value={gateOmegaOverhangL} onChange={(e) => setGateOmegaOverhangL(e.currentTarget.valueAsNumber || 0)} />
+                  </label>
+                  <label className="block col-span-1">Wysięg P (mm)
+                    <input type="number" className="input" value={gateOmegaOverhangR} onChange={(e) => setGateOmegaOverhangR(e.currentTarget.valueAsNumber || 0)} />
+                  </label>
+                  <div className="text-xs text-gray-600 self-end col-span-1">Wysięgi rozsuwają elementy, żeby nic się nie nakładało.</div>
+                </div>
+              )}
+
+              {/* dodatkowe panele – brama */}
+              <div className="mt-3 font-medium">Dodatkowe panele – BRAMA</div>
               {gateExtraPanels.map((t, i) => (
                 <div key={i} className="flex gap-2 items-end">
                   <label className="block grow">Wys. panelu (mm)
                     <input type="number" className="input" value={t} onChange={(e) => {
-                      const v = e.currentTarget.valueAsNumber || 0;
-                      const next = [...gateExtraPanels]; next[i] = v; setGateExtraPanels(next);
+                      const v = e.currentTarget.valueAsNumber || 0; const next = [...gateExtraPanels]; next[i] = v; setGateExtraPanels(next);
                     }} />
                   </label>
                   <button className="px-2 py-1 border rounded" onClick={() => setGateExtraPanels(gateExtraPanels.filter((_, k) => k !== i))}>Usuń</button>
@@ -632,7 +584,7 @@ export default function App() {
               <button className="px-3 py-1 border rounded" onClick={() => setGateExtraPanels([...gateExtraPanels, 100])}>+ Dodaj panel</button>
               {gateExtraPanels.length > 0 && (
                 <div className="grid grid-cols-2 gap-2 mt-2">
-                  <label className="block">Przerwa po wzorze przęsła (mm)
+                  <label className="block">Przerwa po wzorze (mm)
                     <input type="number" className="input" value={gateGapAfterBase} onChange={(e) => setGateGapAfterBase(e.currentTarget.valueAsNumber || 0)} />
                   </label>
                   <label className="block">Przerwa między dodatkowymi (mm)
@@ -641,7 +593,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Furtka */}
+              {/* furtka */}
               <div className="mt-4 font-medium">Furtka (opcjonalnie)</div>
               <label className="block">Szerokość furtki ({unit})
                 <input type="number" className="input" value={fromMM(wicketWidth, unit)} onChange={(e) => setWicketWidth(toMM(e.currentTarget.valueAsNumber || 0, unit))} />
@@ -649,30 +601,6 @@ export default function App() {
               <label className="block">Wysokość furtki ({unit})
                 <input type="number" className="input" value={fromMM(wicketHeight, unit)} onChange={(e) => setWicketHeight(toMM(e.currentTarget.valueAsNumber || 0, unit))} />
               </label>
-
-              <div className="mt-3 font-medium">Dodatkowe panele – tylko FURTKA</div>
-              {wicketExtraPanels.map((t, i) => (
-                <div key={i} className="flex gap-2 items-end">
-                  <label className="block grow">Wys. panelu (mm)
-                    <input type="number" className="input" value={t} onChange={(e) => {
-                      const v = e.currentTarget.valueAsNumber || 0;
-                      const next = [...wicketExtraPanels]; next[i] = v; setWicketExtraPanels(next);
-                    }} />
-                  </label>
-                  <button className="px-2 py-1 border rounded" onClick={() => setWicketExtraPanels(wicketExtraPanels.filter((_, k) => k !== i))}>Usuń</button>
-                </div>
-              ))}
-              <button className="px-3 py-1 border rounded" onClick={() => setWicketExtraPanels([...wicketExtraPanels, 100])}>+ Dodaj panel</button>
-              {wicketExtraPanels.length > 0 && (
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <label className="block">Przerwa po wzorze przęsła (mm)
-                    <input type="number" className="input" value={wicketGapAfterBase} onChange={(e) => setWicketGapAfterBase(e.currentTarget.valueAsNumber || 0)} />
-                  </label>
-                  <label className="block">Przerwa między dodatkowymi (mm)
-                    <input type="number" className="input" value={wicketGapBetweenExtras} onChange={(e) => setWicketGapBetweenExtras(e.currentTarget.valueAsNumber || 0)} />
-                  </label>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -685,13 +613,10 @@ export default function App() {
           <div>Suma paneli: <b>{fmt2(sumPanels)} mm</b></div>
           <div>Wysokość przęsła (zadana): <b>{fmt2(spanHeight)} mm</b></div>
           <div>
-            Składniki:&nbsp;
-            panele <b>{fmt2(sumPanels)}</b> + przerwy <b>{fmt2(sumSpanGaps)}</b>
+            Składniki: panele <b>{fmt2(sumPanels)}</b> + przerwy <b>{fmt2(sumSpanGaps)}</b>
             {hasFrame ? <> + rama <b>{2 * frameVert}</b></> : null}
             &nbsp;= <b>{fmt2(spanTotalByParts)} mm</b>
-            {Math.abs(spanTotalByParts - spanHeight) > 0 ? (
-              <span className="text-red-600"> (≠ {fmt2(spanHeight)} mm)</span>
-            ) : null}
+            {Math.abs(spanTotalByParts - spanHeight) > 0 ? <span className="text-red-600"> (≠ {fmt2(spanHeight)} mm)</span> : null}
           </div>
 
           {baseError ? (
@@ -702,9 +627,7 @@ export default function App() {
             <div>
               <div className="mt-1">Przerwy (lista):</div>
               <div className="flex flex-wrap gap-1">
-                {spanGaps.map((g, i) => (
-                  <span key={i} className="px-2 py-1 bg-slate-100 rounded">{`${g.toFixed(2)} mm`}</span>
-                ))}
+                {spanGaps.map((g, i) => <span key={i} className="px-2 py-1 bg-slate-100 rounded">{`${g.toFixed(2)} mm`}</span>)}
               </div>
             </div>
           )}
@@ -716,17 +639,11 @@ export default function App() {
                 <div className="text-red-600">{gate.error}</div>
               ) : (
                 <>
-                  <div>Wysokość bramy (zadana): <b>{fmt2(gateHeight)} mm</b></div>
-                  <div>Wysokość całkowita bramy (z pasem pod spodem): <b>{fmt2(gateHeight + gateExtraH)} mm</b></div>
+                  <div>Wysokość (zadana): <b>{fmt2(gateHeight)} mm</b></div>
+                  <div>Wysokość całkowita (z dołem): <b>{fmt2(gateHeight + gateExtraH)} mm</b></div>
                   <div>
-                    Składniki:&nbsp;
-                    panele <b>{gateTotals ? fmt2(gateTotals.p) : 0}</b> +
-                    przerwy <b>{gateTotals ? fmt2(gateTotals.gsum) : 0}</b> +
-                    rama <b>{2 * frameVert}</b>
+                    Składniki: panele <b>{gateTotals ? fmt2(gateTotals.p) : 0}</b> + przerwy <b>{gateTotals ? fmt2(gateTotals.gsum) : 0}</b> + rama <b>{2 * frameVert}</b>
                     &nbsp;= <b>{gateTotals ? fmt2(gateTotals.total) : 0} mm</b>
-                    {gateTotals && Math.abs(gateTotals.total - (gateHeight + gateExtraH)) > 0 ? (
-                      <span className="text-red-600"> (≠ {fmt2(gateHeight + gateExtraH)} mm)</span>
-                    ) : null}
                   </div>
                 </>
               )}
@@ -736,16 +653,11 @@ export default function App() {
                 <div className="text-red-600">{wicket.error}</div>
               ) : (
                 <>
-                  <div>Wysokość furtki (zadana): <b>{fmt2(wicketHeight)} mm</b></div>
+                  <div>Wysokość (zadana): <b>{fmt2(wicketHeight)} mm</b></div>
+                  <div>Wysokość całkowita (z dołem): <b>{fmt2(wicketHeight + wicketExtraH)} mm</b></div>
                   <div>
-                    Składniki:&nbsp;
-                    panele <b>{wicketTotals ? fmt2(wicketTotals.p) : 0}</b> +
-                    przerwy <b>{wicketTotals ? fmt2(wicketTotals.gsum) : 0}</b> +
-                    rama <b>{2 * frameVert}</b>
+                    Składniki: panele <b>{wicketTotals ? fmt2(wicketTotals.p) : 0}</b> + przerwy <b>{wicketTotals ? fmt2(wicketTotals.gsum) : 0}</b> + rama <b>{2 * frameVert}</b>
                     &nbsp;= <b>{wicketTotals ? fmt2(wicketTotals.total) : 0} mm</b>
-                    {wicketTotals && Math.abs(wicketTotals.total - (wicketHeight + (gateOmegaEnabled ? gateOmegaH : 0))) > 0 ? (
-                      <span className="text-red-600"> (≠ {fmt2(wicketHeight + (gateOmegaEnabled ? gateOmegaH : 0))} mm)</span>
-                    ) : null}
                   </div>
                 </>
               )}
@@ -758,40 +670,22 @@ export default function App() {
       <div className="p-3 rounded-xl border flex flex-wrap items-end gap-4">
         <label className="block">
           <span className="block text-sm font-medium">Skala (px/mm – podgląd)</span>
-          <input
-            type="range"
-            min={0.05}
-            max={0.6}
-            step={0.01}
-            value={scale}
-            onChange={(e) => setScale(e.currentTarget.valueAsNumber || 0.2)}
-          />
+          <input type="range" min={0.05} max={0.6} step={0.01} value={scale} onChange={(e) => setScale(e.currentTarget.valueAsNumber || 0.2)} />
         </label>
 
         <label className="block">
           <span className="block text-sm font-medium">Nr zlecenia/oferty</span>
-          <input
-            type="text"
-            className="input"
-            value={orderNo}
-            onChange={(e) => setOrderNo(e.currentTarget.value)}
-          />
+          <input type="text" className="input" value={orderNo} onChange={(e) => setOrderNo(e.currentTarget.value)} />
         </label>
 
         <div className="flex gap-2 ml-auto">
-          <button className="px-3 py-2 rounded border" onClick={() => exportSVG()}>
-            Pobierz SVG
-          </button>
-          <button className="px-3 py-2 rounded border" onClick={() => exportPNG(300)}>
-            PNG 300 DPI
-          </button>
-          <button className="px-3 py-2 rounded border" onClick={() => exportPNG(150)}>
-            PNG 150 DPI
-          </button>
+          <button className="px-3 py-2 rounded border" onClick={() => exportSVG()}>Pobierz SVG</button>
+          <button className="px-3 py-2 rounded border" onClick={() => exportPNG(300)}>PNG 300 DPI</button>
+          <button className="px-3 py-2 rounded border" onClick={() => exportPNG(150)}>PNG 150 DPI</button>
         </div>
       </div>
 
-      {/* Rysunek */}
+      {/* RYSUNEK */}
       <div className="p-3 rounded-xl border overflow-auto bg-white">
         <svg ref={svgRef} width={totalWidthMM * scale} height={maxHeightMM * scale}>
           <defs>
@@ -800,29 +694,10 @@ export default function App() {
             </marker>
           </defs>
 
-          {/* Nagłówek w SVG */}
+          {/* nagłówek */}
           <g>
-            <text x={10} y={12} fontSize={12} fontWeight={600}>
-              Nr zlecenia/oferty: {orderNo || "-"}
-            </text>
-            <text x={260} y={12} fontSize={12}>
-              Skala podglądu: {scale.toFixed(2)} px/mm
-            </text>
-            {[
-              `Przęsło – panele: ${fmt2(sumPanels)}; przerwy: ${fmt2(sumSpanGaps)}; rama: ${hasFrame ? 2 * frameVert : 0}; suma: ${fmt2(spanTotalByParts)} (zadane: ${fmt2(spanHeight)})`,
-              gate && gateTotals
-                ? `Brama – panele: ${fmt2(gateTotals.p)}; przerwy: ${fmt2(gateTotals.gsum)}; rama: ${2 * frameVert}; suma: ${fmt2(gateTotals.total)} (zadane: ${fmt2(gateHeight + gateExtraH)})`
-                : null,
-              wicket && wicketTotals
-                ? `Furtka – panele: ${fmt2(wicketTotals.p)}; przerwy: ${fmt2(wicketTotals.gsum)}; rama: ${2 * frameVert}; suma: ${fmt2(wicketTotals.total)} (zadane: ${fmt2(wicketHeight + (gateOmegaEnabled ? gateOmegaH : 0))})`
-                : null,
-            ]
-              .filter(Boolean)
-              .map((line, i) => (
-                <text key={i} x={10} y={24 + i * 12} fontSize={11}>
-                  {line as string}
-                </text>
-              ))}
+            <text x={10} y={12} fontSize={12} fontWeight={600}>Nr zlecenia/oferty: {orderNo || "-"}</text>
+            <text x={260} y={12} fontSize={12}>Skala podglądu: {scale.toFixed(2)} px/mm</text>
           </g>
 
           {/* PRZĘSŁO */}
@@ -830,7 +705,6 @@ export default function App() {
             const yOffset = TOP_MARGIN_MM * scale;
             const xSpan = 10 * scale;
             if (baseError || spanGapError) return null;
-
             return (
               <g transform={`translate(${xSpan}, ${yOffset})`}>
                 <LayoutBlock
@@ -851,7 +725,12 @@ export default function App() {
           {gateType !== "none" && (() => {
             const gateYOffset = TOP_MARGIN_MM * scale;
             const wicketYOffset = gateYOffset;
-            const xGate = (10 + spanWidth + LABEL_COL_MM + MODULE_GUTTER_MM) * scale;
+
+            const ol = omegaCfg?.overhangL ?? 0;
+            const or = omegaCfg?.overhangR ?? 0;
+
+            // brama dosunięta o lewy wysięg, żeby nie wchodziła na przęsło
+            const xGate = (10 + spanWidth + LABEL_COL_MM + MODULE_GUTTER_MM + ol) * scale;
 
             const bottomSupports = gateBottomEnabled ? { height: gateBottomSupportH, xs: gateBottomXs } : undefined;
 
@@ -862,12 +741,13 @@ export default function App() {
                     title="Brama skrzydłowa – skrzydło L"
                     outerW={gateWidth / 2}
                     outerH={gateHeight}
-                    withFrame={true}
+                    withFrame
                     gaps={gate.gaps}
                     panels={gate.panels}
                     scale={scale}
                     frameVert={frameVert}
                     bottomSupports={bottomSupports}
+                    bottomProfile={profileCfg}
                     omega={omegaCfg}
                   />
                   <g transform={`translate(${(gateWidth / 2 + 10) * scale}, 0)`}>
@@ -875,12 +755,13 @@ export default function App() {
                       title="Brama skrzydłowa – skrzydło P"
                       outerW={gateWidth / 2}
                       outerH={gateHeight}
-                      withFrame={true}
+                      withFrame
                       gaps={gate.gaps}
                       panels={gate.panels}
                       scale={scale}
                       frameVert={frameVert}
                       bottomSupports={bottomSupports}
+                      bottomProfile={profileCfg}
                       omega={omegaCfg}
                     />
                   </g>
@@ -891,26 +772,28 @@ export default function App() {
                     title="Brama przesuwna"
                     outerW={gateWidth}
                     outerH={gateHeight}
-                    withFrame={true}
+                    withFrame
                     gaps={gate.gaps}
                     panels={gate.panels}
                     scale={scale}
                     frameVert={frameVert}
                     verticalBars={slidingVerticalBars}
                     bottomSupports={bottomSupports}
+                    bottomProfile={profileCfg}
                     omega={omegaCfg}
                   />
                 </g>
               )
             ) : null;
 
+            // furtka: bazowy x + prawy wysięg bramy + lewy wysięg furtki
             const gateWidthWithLabels =
               gateType === "skrzydłowa"
                 ? gateWidth + 2 * LABEL_COL_MM + 10
                 : gateWidth + LABEL_COL_MM;
 
             const xWicket =
-              (10 + spanWidth + LABEL_COL_MM + MODULE_GUTTER_MM + gateWidthWithLabels + MODULE_GUTTER_MM) * scale;
+              (10 + spanWidth + LABEL_COL_MM + MODULE_GUTTER_MM + ol + gateWidthWithLabels + or + MODULE_GUTTER_MM + ol) * scale;
 
             const wicketBlock = wicket ? (
               <g transform={`translate(${xWicket}, ${wicketYOffset})`}>
@@ -918,20 +801,21 @@ export default function App() {
                   title="Furtka"
                   outerW={wicketWidth}
                   outerH={wicketHeight}
-                  withFrame={true}
+                  withFrame
                   gaps={wicket.gaps}
                   panels={wicket.panels}
                   scale={scale}
                   frameVert={frameVert}
+                  bottomProfile={profileCfg}
                   omega={omegaCfg}
                 />
               </g>
             ) : null;
 
-            // Δ wysokości względem przęsła (liczymy z dodatkami pod spodem)
+            // Δ wysokości (liczymy z dodatkami pod spodem)
             const xDeltaGate = (10 + spanWidth + LABEL_COL_MM + MODULE_GUTTER_MM / 2) * scale;
             const xDeltaWicket =
-              (10 + spanWidth + LABEL_COL_MM + MODULE_GUTTER_MM + gateWidthWithLabels + MODULE_GUTTER_MM / 2) * scale;
+              (10 + spanWidth + LABEL_COL_MM + MODULE_GUTTER_MM + (gateWidthWithLabels + ol + or) + MODULE_GUTTER_MM / 2) * scale;
 
             return (
               <g>
@@ -967,7 +851,7 @@ export default function App() {
                       x1={xDeltaWicket}
                       x2={xDeltaWicket}
                       y1={(TOP_MARGIN_MM + spanHeight) * scale}
-                      y2={(TOP_MARGIN_MM + (wicketHeight + (gateOmegaEnabled ? gateOmegaH : 0))) * scale}
+                      y2={(TOP_MARGIN_MM + (wicketHeight + wicketExtraH)) * scale}
                       stroke="#333"
                       markerStart="url(#arrowhead)"
                       markerEnd="url(#arrowhead)"
@@ -975,11 +859,11 @@ export default function App() {
                     />
                     <text
                       x={xDeltaWicket + 3}
-                      y={(TOP_MARGIN_MM + Math.min(wicketHeight + (gateOmegaEnabled ? gateOmegaH : 0), spanHeight) + Math.abs(wicketHeight + (gateOmegaEnabled ? gateOmegaH : 0) - spanHeight) / 2) * scale}
+                      y={(TOP_MARGIN_MM + Math.min(wicketHeight + wicketExtraH, spanHeight) + Math.abs(wicketHeight + wicketExtraH - spanHeight) / 2) * scale}
                       fontSize={12}
                       style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
                     >
-                      {`Δ: ${Math.abs((wicketHeight + (gateOmegaEnabled ? gateOmegaH : 0)) - spanHeight)} mm`}
+                      {`Δ: ${Math.abs((wicketHeight + wicketExtraH) - spanHeight)} mm`}
                     </text>
                   </g>
                 )}
@@ -990,7 +874,7 @@ export default function App() {
       </div>
 
       <div className="text-xs text-gray-500">
-        * Zaokrąglanie do 0,01 mm. Brama skrzydłowa rysowana jako dwa równe skrzydła; brama przesuwna ma pionowe wzmocnienia zależnie od szerokości. „Przestrzeń 2” to wsporniki pod dolną ramą oraz omega/profil pod wspornikami – obie warstwy są liczone do wysokości całkowitej.
+        * Panele i przerwy liczone do wysokości ramy. Pod ramą rysujemy (od góry): wsporniki A, profil B, omegę Ω z wysięgami L/P. Wszystkie warstwy są wliczane do wysokości całkowitej, a furtka jest automatycznie odsuwana o wysięgi, by nic się nie nakładało.
       </div>
     </div>
   );
