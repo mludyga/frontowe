@@ -69,6 +69,8 @@ export default function App() {
   const [gateType, setGateType] = useState<GateType>("none");
   const [gateWidth, setGateWidth] = useState<number>(4000);
   const [gateHeight, setGateHeight] = useState<number>(1400);
+  const [gateEqualBays, setGateEqualBays] = useState<boolean>(true);
+
 
   // Przestrzeń 2 – BRAMA
   const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
@@ -329,15 +331,28 @@ export default function App() {
 
   // --- wzmocnienia pionowe dla bramy przesuwnej (X w mm od lewej) ---
   const slidingVerticalBars = useMemo(() => {
-    if (gateType !== "przesuwna") return [];
-    const f = frameVert;
-    const innerW = Math.max(0, gateWidth - 2 * f);
-    if (innerW <= 0) return [];
-    if (gateWidth < 5000) {
-      return [f + innerW / 2 - f / 2];
-    }
+  if (gateType !== "przesuwna") return [];
+  const f = frameVert;
+  const innerW = Math.max(0, gateWidth - 2 * f);
+  if (innerW <= 0) return [];
+
+  // < 5 m: jedno wzmocnienie (pośrodku) — daje dwa równe światła
+  if (gateWidth < 5000) {
+    return [f + innerW / 2 - f / 2]; // x-lewa krawędź wzmocnienia
+  }
+
+  // ≥ 5 m: dwa wzmocnienia
+  if (gateEqualBays) {
+    // równe światła: 3S + 2f = innerW  =>  S = (innerW - 2f)/3
+    const S = (innerW - 2 * f) / 3;
+    const x1 = f + S;       // lewa krawędź 1. wzmocnienia
+    const x2 = f + 2 * S + f; // lewa krawędź 2. wzmocnienia
+    return [x1, x2];
+  } else {
+    // stary wariant: „co ~1/3” (światła nie są identyczne)
     return [f + innerW / 3 - f / 2, f + (2 * innerW) / 3 - f / 2];
-  }, [gateType, gateWidth, frameVert]);
+  }
+}, [gateType, gateWidth, frameVert, gateEqualBays]);
 
   // --- pozycje krótkich wsporników ---
   const gateBottomXs = useMemo(() => {
