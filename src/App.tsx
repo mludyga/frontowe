@@ -57,7 +57,7 @@ const TOP_MARGIN_MM = 446;
 
 // === BLOK RYSUNKU ===
 function LayoutBlock({
-  title, outerW, outerH, withFrame, gaps, panels, scale, frameVert, verticalBars = []
+  title, outerW, outerH, withFrame, gaps, panels, scale, frameVert, verticalBars = [], bottomSupports,
 }: LayoutProps) {
   const stroke = "#333";
   const fillFrame = "#94a3b8";
@@ -210,6 +210,38 @@ function LayoutBlock({
       );
     }
   }
+   // --- PRZESTRZEŃ 2: pas krótkich wsporników pod dolną ramą ---
+  if (bottomSupports && bottomSupports.height > 0 && bottomSupports.xs.length > 0) {
+    const y = (outerH * scale) + 6; // 6 px odstępu wizualnego pod ramą; przy wariancie B damy to do wnętrza
+    const h = bottomSupports.height * scale;
+    for (const xLeft of bottomSupports.xs) {
+      const x = xLeft * scale;
+      const w = frameVert * scale; // grubość = grubość ramy
+      // słupek
+      // (na razie bez etykiet – dodamy w kolejnym kroku)
+      // cienka ramka, pełne wypełnienie
+      // kolor jak rama, żeby wyglądało spójnie
+      // stroke zgodny z całością
+      // vectorEffect, żeby nie rozjeżdżało się przy skalowaniu
+      // (pamiętaj: y jest poniżej modułu)
+      // (Będzie bardzo łatwo przenieść to do wnętrza, jeśli wybierzesz wariant B)
+      // ---------------------------------------------------------
+      // prostokąt wspornika:
+      // ---------------------------------------------------------
+      // eslint-disable-next-line react/jsx-key
+      elems.push(
+        <rect
+          x={x}
+          y={y}
+          width={w}
+          height={h}
+          fill="#94a3b8"
+          stroke="#333"
+          vectorEffect="non-scaling-stroke"
+        />
+      );
+    }
+  }
 
   // --- wymiary (całkowite, łącznie z ramami) ---
   const dims = (
@@ -251,6 +283,10 @@ export default function KalkulatorPalisada() {
   const [gateType, setGateType] = useState<GateType>("none");
   const [gateWidth, setGateWidth] = useState<number>(4000);
   const [gateHeight, setGateHeight] = useState<number>(1400);
+
+  const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
+  const [gateBottomSupportH, setGateBottomSupportH] = useState<number>(80);
+  const [gateBottomExtraPerSpan, setGateBottomExtraPerSpan] = useState<number>(0);
 
   const [wicketWidth, setWicketWidth] = useState<number>(1000);
   const [wicketHeight, setWicketHeight] = useState<number>(1400);
@@ -611,6 +647,44 @@ export default function KalkulatorPalisada() {
     return [f + innerW / 3 - f / 2, f + (2 * innerW) / 3 - f / 2];
   }, [gateType, gateWidth, frameVert]);
 
+  // Pozycje krótkich wsporników dla bramy (lew. rama, wzmocnienia, praw. rama + ewentualne dodatkowe "po równo")
+const gateBottomXs = useMemo(() => {
+  if (gateType === "none" || !gateBottomEnabled) return [];
+
+  const anchors: number[] = [];
+  const f = frameVert;
+
+  // lewy/prawy bok ramy
+  anchors.push(0);
+  anchors.push(gateWidth - f);
+
+  if (gateType === "przesuwna") {
+    anchors.push(...slidingVerticalBars); // to są x-lewe w mm
+  } else if (gateType === "skrzydłowa") {
+    // dwie kotwy na styku skrzydeł (dwa pionowe "boki ramy")
+    anchors.push(gateWidth / 2 - f, gateWidth / 2);
+  }
+
+  // unikalne i posortowane (gdyby coś się nałożyło)
+  const uniq = Array.from(new Set(anchors.map(a => Math.round(a * 1000) / 1000))).sort((a,b) => a - b);
+
+  // dodatkowe równomierne wsporniki w każdej przerwie
+  const out: number[] = [...uniq];
+  if (gateBottomExtraPerSpan > 0) {
+    for (let i = 0; i < uniq.length - 1; i++) {
+      const a = uniq[i];
+      const b = uniq[i + 1];
+      for (let k = 1; k <= gateBottomExtraPerSpan; k++) {
+        const center = a + (b - a) * (k / (gateBottomExtraPerSpan + 1));
+        out.push(center - f / 2); // x-left tak, by wspornik był wycentrowany w przerwie
+      }
+    }
+  }
+
+  // posortuj końcowo
+  return out.sort((a,b) => a - b);
+}, [gateType, gateWidth, frameVert, slidingVerticalBars, gateBottomEnabled, gateBottomExtraPerSpan]);
+
   return (
     <div className="p-4 space-y-4">
       <h1 className="text-2xl font-bold">Kalkulator ogrodzeń palisadowych – PRO</h1>
@@ -730,6 +804,31 @@ export default function KalkulatorPalisada() {
               <label className="block">Wysokość bramy ({unit})
                 <input type="number" className="input" value={fromMM(gateHeight, unit)} onChange={(e) => setGateHeight(toMM(e.currentTarget.valueAsNumber || 0, unit))} />
               </label>
+
+              <div className="mt-3 font-medium">Przestrzeń 2 – wsporniki (pod dolną ramą)</div>
+<label className="flex items-center gap-2 mb-2">
+  <input
+    type="checkbox"
+    checked={gateBottomEnabled}
+    onChange={(e) => setGateBottomEnabled(e.currentTarget.checked)}
+  />
+  <span>Włącz pas wsporników</span>
+</label>
+{gateBottomEnabled && (
+  <div className="grid grid-cols-3 gap-2">
+    <label className="block">Wys. wspornika (mm)
+      <input type="number" className="input"
+        value={gateBottomSupportH}
+        onChange={(e) => setGateBottomSupportH(e.currentTarget.valueAsNumber || 0)} />
+    </label>
+    <label className="block">Dodatkowe / przerwa
+      <input type="number" className="input" min={0}
+        value={gateBottomExtraPerSpan}
+        onChange={(e) => setGateBottomExtraPerSpan(Math.max(0, e.currentTarget.valueAsNumber || 0))} />
+    </label>
+    <div className="text-xs text-gray-600 self-end">Kotwy: lewy/prawy bok + środek(y). Dodatkowe są rozmieszczane równo.</div>
+  </div>
+)}
 
               <div className="mt-3 font-medium">Dodatkowe panele – tylko BRAMA</div>
               {gateExtraPanels.map((t, i) => (
@@ -979,6 +1078,8 @@ export default function KalkulatorPalisada() {
                     panels={gate.panels}
                     scale={scale}
                     frameVert={frameVert}
+                    bottomSupports={gateBottomEnabled ? { height: gateBottomSupportH, xs: gateBottomXs } : undefined}
+
                   />
                   <g transform={`translate(${(gateWidth / 2 + 10) * scale}, 0)`}>
                     <LayoutBlock
@@ -990,6 +1091,8 @@ export default function KalkulatorPalisada() {
                       panels={gate.panels}
                       scale={scale}
                       frameVert={frameVert}
+                      bottomSupports={gateBottomEnabled ? { height: gateBottomSupportH, xs: gateBottomXs } : undefined}
+
                     />
                   </g>
                 </g>
