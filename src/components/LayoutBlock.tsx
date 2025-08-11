@@ -259,7 +259,7 @@ export default function LayoutBlock({
 
     for (const xLeft of bottomSupports.xs) {
       // pilnujemy, żeby wspornik nie wyszedł poza ramy
-      const clampedX = Math.max(frameT, Math.min(outerW - frameT - frameT, xLeft));
+      const clampedX = Math.max(0, Math.min(outerW - frameVert, xLeft));
       const X = clampedX * scale;
       elems.push(
         <rect
