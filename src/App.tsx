@@ -853,6 +853,8 @@ export default function App() {
               ) : (
                 <>
                   <div>Wysokość bramy (zadana): <b>{fmt2(gateHeight)} mm</b></div>
+                  <div>Wysokość całkowita bramy (z pasem): <b>{fmt2(gateHeight + gateExtraH)} mm</b></div>
+
                   <div>
                     Składniki:&nbsp;
                     panele <b>{gateTotals ? fmt2(gateTotals.p) : 0}</b> +
