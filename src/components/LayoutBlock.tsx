@@ -214,7 +214,10 @@ export default function LayoutBlock({
           />
           <text
             x={(outerW + 10) * scale}
-            y={(cursorY + gBottom / 2) * scale}
+            const hasBottomSupports =
+            !!(bottomSupports && bottomSupports.height > 0 && bottomSupports.xs.length > 0);
+
+            y={((cursorY + gBottom / 2) * scale) - (hasBottomSupports ? 8 : 0)}
             dominantBaseline="middle"
             fontSize={12}
             style={{
@@ -274,24 +277,22 @@ export default function LayoutBlock({
       );
     }
 
-    // etykieta wysokości pasa wsporników (po prawej)
-    elems.push(
-      <text
-        x={(outerW + 10) * scale}
-        y={(outerH - frameT - h / 2) * scale}
-        dominantBaseline="middle"
-        fontSize={12}
-        style={{
-          paintOrder: "stroke",
-          stroke: "#fff",
-          strokeWidth: 3,
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {`${h.toFixed(2)} mm (wspornik)`}
-      </text>
-    );
-  }
+    const ySupportLabel = (outerH + 12) * scale; // 12 px poniżej modułu
+elems.push(
+  <text
+    x={(outerW + 10) * scale}
+    y={ySupportLabel}
+    fontSize={12}
+    style={{
+      paintOrder: "stroke",
+      stroke: "#fff",
+      strokeWidth: 3,
+      fontVariantNumeric: "tabular-nums",
+    }}
+  >
+    {`A: ${h.toFixed(2)} mm`}
+  </text>
+);
 
   // --- wymiary całkowite (łącznie z ramami) ---
   const dims = (
