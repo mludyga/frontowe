@@ -10,13 +10,13 @@ export type LayoutProps = {
   scale: number;
   frameVert: number;         // grubość ramy — ta sama dla góra/dół/lewo/prawo
   verticalBars?: number[];   // pozycje X (w mm, od lewej krawędzi zewnętrznej); szer. = frameVert
-  bottomSupports?: {         // pas krótkich wsporników pod dolną ramą (przestrzeń nr 2)
+  bottomSupports?: {         // pas krótkich wsporników (przestrzeń nr 2)
     height: number;          // wysokość wspornika (mm)
     xs: number[];            // x-lewe (mm) każdego wspornika względem lewej krawędzi zewnętrznej
   };
 };
 
-// Te same stałe co w widoku; można też wynieść do osobnego "constants.ts".
+// Te same stałe co w widoku
 export const LABEL_COL_MM = 148;
 
 export default function LayoutBlock({
@@ -248,25 +248,47 @@ export default function LayoutBlock({
     }
   }
 
-  // --- PRZESTRZEŃ 2: pas krótkich wsporników pod dolną ramą (wizualnie pod modułem) ---
-  if (bottomSupports && bottomSupports.height > 0 && bottomSupports.xs.length > 0) {
-    const y = outerH * scale + 6; // mały odstęp wizualny
-    const h = bottomSupports.height * scale;
+  // --- PRZESTRZEŃ 2: pas krótkich wsporników POD dolną ramą (wewnątrz modułu) ---
+  if (withFrame && bottomSupports && bottomSupports.height > 0 && bottomSupports.xs.length > 0) {
+    const h = bottomSupports.height;
+    const y = (outerH - frameT - h) * scale;   // start tuż nad dolną ramą, wewnątrz
+    const H = h * scale;
+    const W = frameT * scale;                  // szerokość = grubość ramy
+
     for (const xLeft of bottomSupports.xs) {
-      const x = xLeft * scale;
-      const w = frameVert * scale; // grubość = grubość ramy
+      // pilnujemy, żeby wspornik nie wyszedł poza ramy
+      const clampedX = Math.max(frameT, Math.min(outerW - frameT - frameT, xLeft));
+      const X = clampedX * scale;
       elems.push(
         <rect
-          x={x}
+          x={X}
           y={y}
-          width={w}
-          height={h}
+          width={W}
+          height={H}
           fill={fillFrame}
           stroke={stroke}
           vectorEffect="non-scaling-stroke"
         />
       );
     }
+
+    // etykieta wysokości pasa wsporników (po prawej)
+    elems.push(
+      <text
+        x={(outerW + 10) * scale}
+        y={(outerH - frameT - h / 2) * scale}
+        dominantBaseline="middle"
+        fontSize={12}
+        style={{
+          paintOrder: "stroke",
+          stroke: "#fff",
+          strokeWidth: 3,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {`${h.toFixed(2)} mm (wspornik)`}
+      </text>
+    );
   }
 
   // --- wymiary całkowite (łącznie z ramami) ---
@@ -332,7 +354,7 @@ export default function LayoutBlock({
 
   return (
     <g>
-      {elems} {/* panele + przerwy */}
+      {elems} {/* panele + przerwy + wsporniki */}
       {frame} {/* rama na wierzchu (żeby zasłonić brzegi paneli) */}
       {dims}
     </g>
