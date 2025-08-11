@@ -24,7 +24,10 @@ type LayoutProps = {
 const unitFactorToMM: Record<Unit, number> = { mm: 1, cm: 10, in: 25.4 };
 const toMM = (v: number, unit: Unit) => v * unitFactorToMM[unit];
 const fromMM = (vmm: number, unit: Unit) => vmm / unitFactorToMM[unit];
-const roundMM = (n: number) => Math.round(n);
+// 0.01 mm
+const round2 = (n: number) => fmt2(n * 100) / 100;
+// do wyświetlania
+const fmt2 = (n: number) => n.toFixed(2);
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 const parseNumber = (raw: string) => {
   if (raw.trim() === "") return NaN;
@@ -317,12 +320,10 @@ export default function KalkulatorPalisada() {
       const count = gapCountSpan;
       if (count === 0) return { gaps: [], error: "" };
       const g = (spanInternalHeight - sumPanels) / count;
-      const rounded = roundMM(g);
+      const rounded = round2(g);
       const gaps = Array(count).fill(rounded);
-      const correction = spanInternalHeight - sumPanels - rounded * count;
-      if (Math.abs(correction) >= 0.5) gaps[gaps.length - 1] = roundMM(rounded + correction);
-      return { gaps, error: "" };
-    }
+      return { gaps, error: "" }; // bez dopalania korekty
+      }
 
     const expected = gapCountSpan;
     const vec = Array.from({ length: expected }, (_, i) => customGaps[i] ?? { value: null, locked: false });
@@ -500,8 +501,8 @@ export default function KalkulatorPalisada() {
       const totalWidthMM = (svg.width.baseVal.value) / scale;
       const totalHeightMM = (svg.height.baseVal.value) / scale;
 
-      const targetWpx = Math.round(totalWidthMM * MM_TO_IN * dpi);
-      const targetHpx = Math.round(totalHeightMM * MM_TO_IN * dpi);
+      const targetWpx = fmt2(totalWidthMM * MM_TO_IN * dpi);
+      const targetHpx = fmt2(totalHeightMM * MM_TO_IN * dpi);
 
       const canvas = document.createElement("canvas");
       canvas.width = targetWpx;
@@ -535,8 +536,8 @@ export default function KalkulatorPalisada() {
       img.onload = () => {
         const totalWidthMM = (svgRef.current!.width.baseVal.value) / scale;
         const totalHeightMM = (svgRef.current!.height.baseVal.value) / scale;
-        const targetWpx = Math.round(totalWidthMM * MM_TO_IN * dpi);
-        const targetHpx = Math.round(totalHeightMM * MM_TO_IN * dpi);
+        const targetWpx = fmt2(totalWidthMM * MM_TO_IN * dpi);
+        const targetHpx = fmt2(totalHeightMM * MM_TO_IN * dpi);
 
         const canvas = document.createElement("canvas");
         canvas.width = targetWpx;
@@ -716,7 +717,7 @@ export default function KalkulatorPalisada() {
             <div>
               <label className="block">Szerokość bramy ({unit})
                 <input type="number" className="input" value={fromMM(gateWidth, unit)} onChange={(e) => setGateWidth(toMM(e.currentTarget.valueAsNumber || 0, unit))} />
-                {gateType === "skrzydłowa" && <div className="text-xs text-gray-600">Rysujemy 2 równe skrzydła po {Math.round(gateWidth / 2)} mm.</div>}
+                {gateType === "skrzydłowa" && <div className="text-xs text-gray-600">Rysujemy 2 równe skrzydła po {fmt2(gateWidth / 2)} mm.</div>}
               </label>
               <label className="block">Wysokość bramy ({unit})
                 <input type="number" className="input" value={fromMM(gateHeight, unit)} onChange={(e) => setGateHeight(toMM(e.currentTarget.valueAsNumber || 0, unit))} />
@@ -786,15 +787,15 @@ export default function KalkulatorPalisada() {
           <div className="font-semibold">Podsumowanie</div>
 
           <div className="font-medium mt-1">Przęsło</div>
-          <div>Suma paneli: <b>{Math.round(sumPanels)} mm</b></div>
-          <div>Wysokość przęsła (zadana): <b>{Math.round(spanHeight)} mm</b></div>
+          <div>Suma paneli: <b>{fmt2(sumPanels)} mm</b></div>
+          <div>Wysokość przęsła (zadana): <b>{fmt2(spanHeight)} mm</b></div>
           <div>
             Składniki:&nbsp;
-            panele <b>{Math.round(sumPanels)}</b> + przerwy <b>{Math.round(sumSpanGaps)}</b>
+            panele <b>{fmt2(sumPanels)}</b> + przerwy <b>{fmt2(sumSpanGaps)}</b>
             {hasFrame ? <> + rama <b>{2 * frameVert}</b></> : null}
-            &nbsp;= <b>{Math.round(spanTotalByParts)} mm</b>
+            &nbsp;= <b>{fmt2(spanTotalByParts)} mm</b>
             {Math.abs(spanTotalByParts - spanHeight) > 0 ? (
-              <span className="text-red-600"> (≠ {Math.round(spanHeight)} mm)</span>
+              <span className="text-red-600"> (≠ {fmt2(spanHeight)} mm)</span>
             ) : null}
           </div>
 
@@ -820,15 +821,15 @@ export default function KalkulatorPalisada() {
                 <div className="text-red-600">{gate.error}</div>
               ) : (
                 <>
-                  <div>Wysokość bramy (zadana): <b>{Math.round(gateHeight)} mm</b></div>
+                  <div>Wysokość bramy (zadana): <b>{fmt2(gateHeight)} mm</b></div>
                   <div>
                     Składniki:&nbsp;
-                    panele <b>{gateTotals ? Math.round(gateTotals.p) : 0}</b> +
-                    przerwy <b>{gateTotals ? Math.round(gateTotals.gsum) : 0}</b> +
+                    panele <b>{gateTotals ? fmt2(gateTotals.p) : 0}</b> +
+                    przerwy <b>{gateTotals ? fmt2(gateTotals.gsum) : 0}</b> +
                     rama <b>{2 * frameVert}</b>
-                    &nbsp;= <b>{gateTotals ? Math.round(gateTotals.total) : 0} mm</b>
+                    &nbsp;= <b>{gateTotals ? fmt2(gateTotals.total) : 0} mm</b>
                     {gateTotals && Math.abs(gateTotals.total - gateHeight) > 0 ? (
-                      <span className="text-red-600"> (≠ {Math.round(gateHeight)} mm)</span>
+                      <span className="text-red-600"> (≠ {fmt2(gateHeight)} mm)</span>
                     ) : null}
                   </div>
                 </>
@@ -839,15 +840,15 @@ export default function KalkulatorPalisada() {
                 <div className="text-red-600">{wicket.error}</div>
               ) : (
                 <>
-                  <div>Wysokość furtki (zadana): <b>{Math.round(wicketHeight)} mm</b></div>
+                  <div>Wysokość furtki (zadana): <b>{fmt2(wicketHeight)} mm</b></div>
                   <div>
                     Składniki:&nbsp;
-                    panele <b>{wicketTotals ? Math.round(wicketTotals.p) : 0}</b> +
-                    przerwy <b>{wicketTotals ? Math.round(wicketTotals.gsum) : 0}</b> +
+                    panele <b>{wicketTotals ? fmt2(wicketTotals.p) : 0}</b> +
+                    przerwy <b>{wicketTotals ? fmt2(wicketTotals.gsum) : 0}</b> +
                     rama <b>{2 * frameVert}</b>
-                    &nbsp;= <b>{wicketTotals ? Math.round(wicketTotals.total) : 0} mm</b>
+                    &nbsp;= <b>{wicketTotals ? fmt2(wicketTotals.total) : 0} mm</b>
                     {wicketTotals && Math.abs(wicketTotals.total - wicketHeight) > 0 ? (
-                      <span className="text-red-600"> (≠ {Math.round(wicketHeight)} mm)</span>
+                      <span className="text-red-600"> (≠ {fmt2(wicketHeight)} mm)</span>
                     ) : null}
                   </div>
                 </>
@@ -912,12 +913,12 @@ export default function KalkulatorPalisada() {
               Skala podglądu: {scale.toFixed(2)} px/mm
             </text>
             {[
-              `Przęsło – panele: ${Math.round(sumPanels)}; przerwy: ${Math.round(sumSpanGaps)}; rama: ${hasFrame ? 2*frameVert : 0}; suma: ${Math.round(spanTotalByParts)} (zadane: ${Math.round(spanHeight)})`,
+              `Przęsło – panele: ${fmt2(sumPanels)}; przerwy: ${fmt2(sumSpanGaps)}; rama: ${hasFrame ? 2*frameVert : 0}; suma: ${fmt2(spanTotalByParts)} (zadane: ${fmt2(spanHeight)})`,
               gate && gateTotals
-                ? `Brama – panele: ${Math.round(gateTotals.p)}; przerwy: ${Math.round(gateTotals.gsum)}; rama: ${2*frameVert}; suma: ${Math.round(gateTotals.total)} (zadane: ${Math.round(gateHeight)})`
+                ? `Brama – panele: ${fmt2(gateTotals.p)}; przerwy: ${fmt2(gateTotals.gsum)}; rama: ${2*frameVert}; suma: ${fmt2(gateTotals.total)} (zadane: ${fmt2(gateHeight)})`
                 : null,
               wicket && wicketTotals
-                ? `Furtka – panele: ${Math.round(wicketTotals.p)}; przerwy: ${Math.round(wicketTotals.gsum)}; rama: ${2*frameVert}; suma: ${Math.round(wicketTotals.total)} (zadane: ${Math.round(wicketHeight)})`
+                ? `Furtka – panele: ${fmt2(wicketTotals.p)}; przerwy: ${fmt2(wicketTotals.gsum)}; rama: ${2*frameVert}; suma: ${fmt2(wicketTotals.total)} (zadane: ${fmt2(wicketHeight)})`
                 : null,
             ]
               .filter(Boolean)
