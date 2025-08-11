@@ -31,8 +31,6 @@ const round2 = (n: number): number =>
 
 const fmt2 = (n: number): string => round2(n).toFixed(2);
 
-const toNum = (v: unknown): number =>
-  typeof v === "number" ? v : Number(v) || 0;
 
 // alias dla wstecznej kompatybilności
 const roundMM = round2;
