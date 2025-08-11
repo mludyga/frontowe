@@ -40,6 +40,8 @@ export default function LayoutBlock({
   const innerY = frameT;
   const innerW = Math.max(0, outerW - 2 * frameT);
   const innerH = Math.max(0, outerH - 2 * frameT);
+  const extraBottom = bottomSupports?.height ?? 0;
+  const totalH = outerH + extraBottom;
 
   function rect(
     x: number,
@@ -93,7 +95,7 @@ export default function LayoutBlock({
         x={0}
         y={0}
         width={(outerW + LABEL_COL_MM) * scale}
-        height={outerH * scale}
+        height={totalH * scale}
         fill="none"
         stroke={stroke}
         vectorEffect="non-scaling-stroke"
@@ -251,7 +253,7 @@ export default function LayoutBlock({
   // --- PRZESTRZEŃ 2: pas krótkich wsporników POD dolną ramą (wewnątrz modułu) ---
   if (withFrame && bottomSupports && bottomSupports.height > 0 && bottomSupports.xs.length > 0) {
     const h = bottomSupports.height;
-    const y = (outerH - frameT - h) * scale;   // start tuż nad dolną ramą, wewnątrz
+    const y = outerH * scale;   // start tuż nad dolną ramą, wewnątrz
     const H = h * scale;
     const W = frameT * scale;                  // szerokość = grubość ramy
 
