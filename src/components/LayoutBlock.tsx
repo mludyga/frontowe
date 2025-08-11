@@ -298,9 +298,9 @@ export default function LayoutBlock({
     <g>
       <line
         x1={0}
-        y1={(outerH + 28) * scale}
+        y1={(totalH + 28) * scale}
         x2={(outerW + LABEL_COL_MM) * scale}
-        y2={(outerH + 28) * scale}
+        y2={(totalH + 28) * scale}
         stroke="#333"
         markerEnd="url(#arrowhead)"
         markerStart="url(#arrowhead)"
@@ -308,7 +308,7 @@ export default function LayoutBlock({
       />
       <text
         x={((outerW + LABEL_COL_MM) * scale) / 2}
-        y={(outerH + 22) * scale}
+        y={(totalH + 22) * scale}
         textAnchor="middle"
         fontSize={12}
         style={{
@@ -323,7 +323,7 @@ export default function LayoutBlock({
         x1={(outerW + LABEL_COL_MM + 28) * scale}
         y1={0}
         x2={(outerW + LABEL_COL_MM + 28) * scale}
-        y2={outerH * scale}
+        y2={totalH * scale}
         stroke="#333"
         markerEnd="url(#arrowhead)"
         markerStart="url(#arrowhead)"
@@ -331,16 +331,16 @@ export default function LayoutBlock({
       />
       <text
         x={(outerW + LABEL_COL_MM + 36) * scale}
-        y={(outerH * scale) / 2}
+        y={(totalH * scale) / 2}
         fontSize={12}
-        transform={`rotate(90 ${(outerW + LABEL_COL_MM + 36) * scale} ${(outerH * scale) / 2})`}
+        transform={`rotate(90 ${(outerW + LABEL_COL_MM + 36) * scale} ${(totalH * scale) / 2})`}
         style={{
           paintOrder: "stroke",
           stroke: "#fff",
           strokeWidth: 3,
           fontVariantNumeric: "tabular-nums",
         }}
-      >{`${outerH} mm`}</text>
+      >{`${totalH} mm`}</text>
 
       <text
         x={0}
