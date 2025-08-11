@@ -68,9 +68,9 @@ export default function App() {
   const [gateExtraPanels, setGateExtraPanels] = useState<number[]>([]);
   const [gateGapAfterBase, setGateGapAfterBase] = useState(0);
   const [gateGapBetweenExtras, setGateGapBetweenExtras] = useState(0);
-  const [wicketExtraPanels, setWicketExtraPanels] = useState<number[]>([]);
-  const [wicketGapAfterBase, setWicketGapAfterBase] = useState(0);
-  const [wicketGapBetweenExtras, setWicketGapBetweenExtras] = useState(0);
+  const [wicketExtraPanels] = useState<number[]>([]);
+  const [wicketGapAfterBase] = useState(0);
+  const [wicketGapBetweenExtras] = useState(0);
 
   const [orderNo, setOrderNo] = useState("");
   const [scale, setScale] = useState(0.2);
