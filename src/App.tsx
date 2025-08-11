@@ -27,6 +27,8 @@ function distributeAutoGaps(leftover: number, autos: number, weights?: number[])
 // stałe layoutu
 const MODULE_GUTTER_MM = 180;
 const TOP_MARGIN_MM = 446;
+const [gateOmegaEnabled, setGateOmegaEnabled] = useState<boolean>(true);
+const [gateOmegaH, setGateOmegaH] = useState<number>(80);
 
 export default function App() {
   const [unit, setUnit] = useState<Unit>("mm");
@@ -270,11 +272,11 @@ export default function App() {
 
   // wysokość „Przestrzeni 2” przy bramie (render i podsumowanie)
   const gateExtraH = useMemo(() => {
-    const supports = gateBottomEnabled ? gateBottomSupportH : 0;
-    const strip = gateStripEnabled ? gateStripH : 0;
-    const omg = gateOmegaEnabled ? gateOmegaH : 0;
-    return Math.max(supports, strip + omg);
-  }, [gateBottomEnabled, gateBottomSupportH, gateStripEnabled, gateStripH, gateOmegaEnabled, gateOmegaH]);
+  const supports = gateBottomEnabled ? gateBottomSupportH : 0;
+  const strip    = gateStripEnabled ? gateStripH : 0;
+  const omg      = gateOmegaEnabled ? gateOmegaH : 0;
+  return supports + strip + omg; // zamiast Math.max(...)
+}, [gateBottomEnabled, gateBottomSupportH, gateStripEnabled, gateStripH, gateOmegaEnabled, gateOmegaH]);
 
   const gateTotals = useMemo(() => {
     if (!gate) return null;
