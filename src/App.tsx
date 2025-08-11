@@ -10,13 +10,15 @@ type GateLayout = { panels: number[]; gaps: number[]; error?: string };
 
 type LayoutProps = {
   title: string;
-  outerW: number;
-  outerH: number;
-  withFrame: boolean;
-  gaps: number[];
-  panels: number[];
+  outerW: number; // całkowita szerokość (z ramami lewo/prawo)
+  outerH: number; // całkowita wysokość (z ramami góra/dół)
+  withFrame: boolean; // jeśli true, rysujemy 4 strony ramy grubości frameVert
+  gaps: number[];     // przerwy pionowe: [top, mid..., bottom] jeśli withFrame; w przeciwnym razie mid...
+  panels: number[];   // wysokości paneli (pionowy stos)
   scale: number;
-  frameVert: number;
+  frameVert: number;  // grubość ramy — *ta sama* dla góra/dół/lewo/prawo
+  // NEW: dodatkowe pionowe wzmocnienia (np. w bramie przesuwnej)
+  verticalBars?: number[]; // pozycje X (w mm, od lewej krawędzi zewnętrznej), szerokość = frameVert
 };
 
 const unitFactorToMM: Record<Unit, number> = { mm: 1, cm: 10, in: 25.4 };
@@ -38,20 +40,24 @@ function distributeAutoGaps(leftover: number, autos: number, weights?: number[])
   return weights.map((w) => (w / wsum) * leftover);
 }
 
-// Layout stałe
+// Layout stałe (zostawiamy jak miałeś, delikatnie większe marginesy)
 const LABEL_COL_MM = 148;
 const MODULE_GUTTER_MM = 180;
 const TOP_MARGIN_MM = 446;
 
 // === BLOK RYSUNKU ===
 function LayoutBlock({
-  title, outerW, outerH, withFrame, gaps, panels, scale, frameVert
+  title, outerW, outerH, withFrame, gaps, panels, scale, frameVert, verticalBars = []
 }: LayoutProps) {
   const stroke = "#333";
   const fillFrame = "#94a3b8";
-  const x0 = 0;
-  const y0 = 0;
+
+  // NEW: obszar wewnętrzny (między ramami lewo/prawo oraz góra/dół)
   const frameT = withFrame ? frameVert : 0;
+  const innerX = frameT;
+  const innerY = frameT;
+  const innerW = Math.max(0, outerW - 2 * frameT);
+  const innerH = Math.max(0, outerH - 2 * frameT);
 
   function rect(x: number, y: number, w: number, h: number, label?: string, fill = "#ddd", s = "#333") {
     const W = w * scale, H = h * scale, X = x * scale, Y = y * scale;
@@ -60,7 +66,7 @@ function LayoutBlock({
         <rect x={X} y={Y} width={W} height={H} fill={fill} stroke={s} vectorEffect="non-scaling-stroke" />
         {label ? (
           <text
-            x={(x + outerW) * scale + 10}
+            x={(outerW + 6) * scale}  // etykiety w kolumnie
             y={Y + H / 2}
             dominantBaseline="middle"
             fontSize={12}
@@ -73,31 +79,39 @@ function LayoutBlock({
     );
   }
 
+  // --- rama (4 strony) ---
   const frame = (
     <g>
-      <rect x={x0 * scale} y={y0 * scale} width={(outerW + LABEL_COL_MM) * scale} height={outerH * scale} fill="none" stroke={stroke} vectorEffect="non-scaling-stroke" />
+      {/* zewnętrzny obrys modułu + kolumna etykiet */}
+      <rect x={0} y={0} width={(outerW + LABEL_COL_MM) * scale} height={outerH * scale} fill="none" stroke={stroke} vectorEffect="non-scaling-stroke" />
       {withFrame && (
-        <g>
-          {rect(x0, y0, outerW, frameT, undefined, fillFrame)}
-          {rect(x0, y0 + outerH - frameT, outerW, frameT, undefined, fillFrame)}
-        </g>
+        <>
+          {/* góra / dół */}
+          {rect(0, 0, outerW, frameT, undefined, fillFrame)}
+          {rect(0, outerH - frameT, outerW, frameT, undefined, fillFrame)}
+          {/* NEW: lewo / prawo */}
+          {rect(0, 0, frameT, outerH, undefined, fillFrame)}
+          {rect(outerW - frameT, 0, frameT, outerH, undefined, fillFrame)}
+        </>
       )}
     </g>
   );
 
-  // --- zbieramy elementy rysunku ---
   const elems: JSX.Element[] = [];
 
-  // narysuj GÓRNĄ przerwę, jeśli jest rama i przerwa > 0
+  // --- przerwa TOP (tylko jeśli jest rama) ---
+  let cursorY = innerY;
+  let gapIdx = 0;
+
   if (withFrame) {
     const gTop = gaps[0] ?? 0;
     if (gTop > 0) {
       elems.push(
         <g>
           <rect
-            x={x0 * scale}
-            y={(y0 + frameT) * scale}
-            width={outerW * scale}
+            x={innerX * scale}
+            y={(innerY) * scale}
+            width={innerW * scale}
             height={gTop * scale}
             fill="#f1f5f9"
             stroke="#64748b"
@@ -105,8 +119,8 @@ function LayoutBlock({
             vectorEffect="non-scaling-stroke"
           />
           <text
-            x={(x0 + outerW) * scale + 10}
-            y={(y0 + frameT + gTop / 2) * scale}
+            x={(outerW + 10) * scale}
+            y={(innerY + gTop / 2) * scale}
             dominantBaseline="middle"
             fontSize={12}
             style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
@@ -116,60 +130,83 @@ function LayoutBlock({
         </g>
       );
     }
+    cursorY += gTop;
+    gapIdx = 1;
   }
 
-  let cursorY = withFrame ? frameT + (gaps[0] ?? 0) : 0;
-  let gapIdx = withFrame ? 1 : 0;
-
+  // --- panele + przerwy środkowe ---
   for (let i = 0; i < panels.length; i++) {
     const t = panels[i];
-    elems.push(rect(x0, cursorY, outerW, t, `${t} mm`));
+    elems.push(rect(innerX, cursorY, innerW, t, `${t} mm`));
     cursorY += t;
     if (i < panels.length - 1) {
       const g = gaps[gapIdx++] ?? 0;
+      if (g > 0) {
+        elems.push(
+          <g>
+            <rect x={innerX * scale} y={cursorY * scale} width={innerW * scale} height={g * scale} fill="#f1f5f9" stroke="#64748b" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+            <text
+              x={(outerW + 10) * scale}
+              y={(cursorY + g / 2) * scale}
+              dominantBaseline="middle"
+              fontSize={12}
+              style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
+            >
+              {`${Math.round(g)} mm`}
+            </text>
+          </g>
+        );
+      }
+      cursorY += g;
+    }
+  }
+
+  // --- przerwa BOTTOM (tylko jeśli jest rama) ---
+  if (withFrame) {
+    const gBottom = gaps[gaps.length - 1] ?? 0;
+    if (gBottom > 0) {
       elems.push(
         <g>
-          <rect x={x0 * scale} y={cursorY * scale} width={outerW * scale} height={Math.max(0, g) * scale} fill="#f1f5f9" stroke="#64748b" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+          <rect x={innerX * scale} y={cursorY * scale} width={innerW * scale} height={gBottom * scale} fill="#f1f5f9" stroke="#64748b" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
           <text
-            x={(x0 + outerW) * scale + 10}
-            y={(cursorY + Math.max(0, g) / 2) * scale}
+            x={(outerW + 10) * scale}
+            y={(cursorY + gBottom / 2) * scale}
             dominantBaseline="middle"
             fontSize={12}
             style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
           >
-            {`${Math.round(g)} mm`}
+            {`${Math.round(gBottom)} mm`}
           </text>
         </g>
       );
-      cursorY += Math.max(0, g);
     }
   }
 
-  if (withFrame) {
-    const gBottom = gaps[gaps.length - 1] ?? 0;
-    elems.push(
-      <g>
-        <rect x={x0 * scale} y={cursorY * scale} width={outerW * scale} height={Math.max(0, gBottom) * scale} fill="#f1f5f9" stroke="#64748b" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
-        <text
-          x={(x0 + outerW) * scale + 10}
-          y={(cursorY + Math.max(0, gBottom) / 2) * scale}
-          dominantBaseline="middle"
-          fontSize={12}
-          style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
-        >
-          {`${Math.round(gBottom)} mm`}
-        </text>
-      </g>
-    );
+  // --- wzmocnienia pionowe (np. brama przesuwna) ---
+  if (withFrame && verticalBars.length > 0) {
+    for (const xLeft of verticalBars) {
+      // przycinamy w obszarze między górną a dolną ramą
+      const clampedX = Math.max(frameT, Math.min(outerW - frameT - frameT, xLeft));
+      elems.push(
+        <rect
+          x={clampedX * scale}
+          y={innerY * scale}
+          width={frameT * scale}
+          height={innerH * scale}
+          fill={fillFrame}
+          stroke={stroke}
+          vectorEffect="non-scaling-stroke"
+        />
+      );
+    }
   }
 
+  // --- wymiary (całkowite, łącznie z ramami) ---
   const dims = (
     <g>
-      {/* szerokość */}
       <line x1={0} y1={(outerH + 28) * scale} x2={(outerW + LABEL_COL_MM) * scale} y2={(outerH + 28) * scale} stroke="#333" markerEnd="url(#arrowhead)" markerStart="url(#arrowhead)" vectorEffect="non-scaling-stroke" />
       <text x={((outerW + LABEL_COL_MM) * scale) / 2} y={(outerH + 22) * scale} textAnchor="middle" fontSize={12} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}>{`${outerW} mm`}</text>
 
-      {/* wysokość */}
       <line x1={(outerW + LABEL_COL_MM + 28) * scale} y1={0} x2={(outerW + LABEL_COL_MM + 28) * scale} y2={outerH * scale} stroke="#333" markerEnd="url(#arrowhead)" markerStart="url(#arrowhead)" vectorEffect="non-scaling-stroke" />
       <text x={(outerW + LABEL_COL_MM + 36) * scale} y={(outerH * scale) / 2} fontSize={12} transform={`rotate(90 ${(outerW + LABEL_COL_MM + 36) * scale} ${(outerH * scale) / 2})`} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}>{`${outerH} mm`}</text>
 
@@ -178,36 +215,44 @@ function LayoutBlock({
   );
 
   return (
-  <g>
-    {elems}   {/* panele + wszystkie przerwy (w tym górna) */}
-    {frame}   {/* rama NA WIERZCHU */}
-    {dims}    {/* wymiary na samym końcu */}
-  </g>
-);
+    <g>
+      {elems}   {/* panele + przerwy */}
+      {frame}   {/* rama na wierzchu (żeby zasłonić brzegi paneli) */}
+      {dims}
+    </g>
+  );
 }
 
+// === APLIKACJA ===
 export default function KalkulatorPalisada() {
   const [unit, setUnit] = useState<Unit>("mm");
   const [spanWidth, setSpanWidth] = useState<number>(2000);
   const [spanHeight, setSpanHeight] = useState<number>(1200);
+
+  // NEW: jedna grubość ramy dla wszystkich boków
   const [hasFrame, setHasFrame] = useState<boolean>(false);
   const [frameVert, setFrameVert] = useState<number>(60);
-  const [frameHoriz, setFrameHoriz] = useState<number>(60);
+
   const [groups, setGroups] = useState<PanelGroup[]>([{ qty: 6, t: 100, inGate: true }]);
   const [gapMode, setGapMode] = useState<GapMode>("equal");
   const [weightedAuto, setWeightedAuto] = useState<boolean>(false);
   const [customGaps, setCustomGaps] = useState<CustomGap[]>([]);
+
   const [gateType, setGateType] = useState<GateType>("none");
   const [gateWidth, setGateWidth] = useState<number>(4000);
   const [gateHeight, setGateHeight] = useState<number>(1400);
+
   const [wicketWidth, setWicketWidth] = useState<number>(1000);
   const [wicketHeight, setWicketHeight] = useState<number>(1400);
+
+  // dodatkowe panele (grupy w uproszczeniu — lista wysokości)
   const [gateExtraPanels, setGateExtraPanels] = useState<number[]>([]);
   const [gateGapAfterBase, setGateGapAfterBase] = useState<number>(0);
   const [gateGapBetweenExtras, setGateGapBetweenExtras] = useState<number>(0);
   const [wicketExtraPanels, setWicketExtraPanels] = useState<number[]>([]);
   const [wicketGapAfterBase, setWicketGapAfterBase] = useState<number>(0);
   const [wicketGapBetweenExtras, setWicketGapBetweenExtras] = useState<number>(0);
+
   const [orderNo, setOrderNo] = useState<string>("");
   const [scale, setScale] = useState<number>(0.2);
 
@@ -238,7 +283,12 @@ export default function KalkulatorPalisada() {
 
   const nPanels = panelList.length;
   const sumPanels = useMemo(() => sum(panelList), [panelList]);
-  const spanInternalHeight = useMemo(() => (hasFrame ? Math.max(0, spanHeight - 2 * frameVert) : spanHeight), [hasFrame, spanHeight, frameVert]);
+
+  // wysokość wewnętrzna przęsła
+  const spanInternalHeight = useMemo(
+    () => (hasFrame ? Math.max(0, spanHeight - 2 * frameVert) : spanHeight),
+    [hasFrame, spanHeight, frameVert]
+  );
 
   const gapCountSpan = useMemo(() => {
     if (nPanels <= 0) return 0;
@@ -262,6 +312,7 @@ export default function KalkulatorPalisada() {
   // obliczenia przerw przęsła
   const spanCalc = useMemo(() => {
     if (nPanels === 0) return { gaps: [] as number[], error: "" };
+
     if (gapMode === "equal") {
       const count = gapCountSpan;
       if (count === 0) return { gaps: [], error: "" };
@@ -272,12 +323,14 @@ export default function KalkulatorPalisada() {
       if (Math.abs(correction) >= 0.5) gaps[gaps.length - 1] = roundMM(rounded + correction);
       return { gaps, error: "" };
     }
+
     const expected = gapCountSpan;
     const vec = Array.from({ length: expected }, (_, i) => customGaps[i] ?? { value: null, locked: false });
     const fixedSum = sum(vec.map((g) => (g.value != null ? g.value : 0)));
     const autos = vec.filter((g) => g.value == null).length;
     const leftover = spanInternalHeight - sumPanels - fixedSum;
     if (leftover < -0.0001) return { gaps: [], error: "Za duże przerwy ręczne względem wysokości" };
+
     let weights: number[] | undefined;
     if (weightedAuto) {
       const mids: number[] = [];
@@ -318,7 +371,14 @@ export default function KalkulatorPalisada() {
     return mids;
   }, [includeMask, nPanels, spanMidGaps]);
 
-  const topGapForGateValue = useMemo(() => (spanGaps[0] ?? 0), [spanGaps]);
+  // NEW: górna przerwa dla bramy/furtki
+  // - jeśli przęsło MA ramę: bierzemy przerwę topową przęsła (spanGaps[0])
+  // - jeśli przęsło NIE MA ramy: bierzemy "typową" przerwę środkową (pierwszą)
+  const typicalSpanMid = spanMidGaps[0] ?? 0;
+  const topGapForGateValue = useMemo(
+    () => (hasFrame ? (spanGaps[0] ?? 0) : typicalSpanMid),
+    [hasFrame, spanGaps, typicalSpanMid]
+  );
 
   function computeGateLayout(
     height: number,
@@ -508,7 +568,7 @@ export default function KalkulatorPalisada() {
   }
   void exportPDFfromPNG;
 
-  // rozmiary całego rysunku
+  // rozmiary całego rysunku (szerokości podglądu)
   const totalWidthMM = useMemo(() => {
     let w = 0;
     w += spanWidth + LABEL_COL_MM;
@@ -528,9 +588,23 @@ export default function KalkulatorPalisada() {
     return h + TOP_MARGIN_MM + 60;
   }, [spanHeight, gateType, gateHeight, wicketHeight]);
 
+  // NEW: pionowe wzmocnienia dla bramy przesuwnej (pozycje X liczone od lewej krawędzi zewnętrznej)
+  const slidingVerticalBars = useMemo(() => {
+    if (gateType !== "przesuwna") return [];
+    const f = frameVert;
+    const innerW = Math.max(0, gateWidth - 2 * f);
+    if (innerW <= 0) return [];
+    if (gateWidth < 5000) {
+      // jedno wzmocnienie na środku
+      return [f + innerW / 2 - f / 2];
+    }
+    // ≥ 5 m: dwa wzmocnienia w ~1/3 i ~2/3
+    return [f + innerW / 3 - f / 2, f + (2 * innerW) / 3 - f / 2];
+  }, [gateType, gateWidth, frameVert]);
+
   return (
     <div className="p-4 space-y-4">
-      <h1 className="text-2xl font-bold">Kalkulator ogrodzeń palisadowych (MVP 4)</h1>
+      <h1 className="text-2xl font-bold">Kalkulator ogrodzeń palisadowych – PRO</h1>
 
       <div className="grid md:grid-cols-3 gap-4">
         {/* Kolumna 1 */}
@@ -552,16 +626,14 @@ export default function KalkulatorPalisada() {
 
           <label className="flex items-center gap-2 mt-2">
             <input type="checkbox" checked={hasFrame} onChange={(e) => setHasFrame(e.currentTarget.checked)} />
-            <span>Przęsło z ramą (góra/dół domyślnie 60 mm dla 60×60)</span>
+            <span>Przęsło z ramą (góra/dół/lewo/prawo – {frameVert} mm)</span>
           </label>
           {hasFrame && (
             <div className="grid grid-cols-2 gap-2">
-              <label className="block">Profil góra/dół (mm)
+              <label className="block">Grubość ramy (mm)
                 <input type="number" className="input" value={frameVert} onChange={(e) => setFrameVert(e.currentTarget.valueAsNumber || 0)} />
               </label>
-              <label className="block">Profil lewo/prawo (mm)
-                <input type="number" className="input" value={frameHoriz} onChange={(e) => setFrameHoriz(e.currentTarget.valueAsNumber || 0)} />
-              </label>
+              <div />
             </div>
           )}
 
@@ -644,7 +716,7 @@ export default function KalkulatorPalisada() {
             <div>
               <label className="block">Szerokość bramy ({unit})
                 <input type="number" className="input" value={fromMM(gateWidth, unit)} onChange={(e) => setGateWidth(toMM(e.currentTarget.valueAsNumber || 0, unit))} />
-                <div className="text-xs text-gray-600">Dla skrzydłowej rysujemy 2 równe skrzydła po {Math.round(gateWidth / 2)} mm.</div>
+                {gateType === "skrzydłowa" && <div className="text-xs text-gray-600">Rysujemy 2 równe skrzydła po {Math.round(gateWidth / 2)} mm.</div>}
               </label>
               <label className="block">Wysokość bramy ({unit})
                 <input type="number" className="input" value={fromMM(gateHeight, unit)} onChange={(e) => setGateHeight(toMM(e.currentTarget.valueAsNumber || 0, unit))} />
@@ -819,9 +891,6 @@ export default function KalkulatorPalisada() {
           <button className="px-3 py-2 rounded border" onClick={() => exportPNG(150)}>
             PNG 150 DPI
           </button>
-          {/* <button className="px-3 py-2 rounded border" onClick={() => exportPDFfromPNG(300)}>
-            PDF (z PNG)
-          </button> */}
         </div>
       </div>
 
@@ -926,6 +995,7 @@ export default function KalkulatorPalisada() {
                     panels={gate.panels}
                     scale={scale}
                     frameVert={frameVert}
+                    verticalBars={slidingVerticalBars}   // NEW: wzmocnienia pionowe
                   />
                 </g>
               )
@@ -976,6 +1046,7 @@ export default function KalkulatorPalisada() {
                 {gateBlock}
                 {wicketBlock}
 
+                {/* Δ wysokości względem przęsła */}
                 {gate && (
                   <g>
                     <line
@@ -1028,7 +1099,7 @@ export default function KalkulatorPalisada() {
       </div>
 
       <div className="text-xs text-gray-500">
-        * Zaokrąglanie do 1 mm. Panele są wyrównane w pionie między elementami. Brama skrzydłowa rysowana jako dwa równe skrzydła.
+        * Zaokrąglanie do 1 mm. Panele są wyrównane pionowo między elementami. Brama skrzydłowa rysowana jako dwa równe skrzydła; brama przesuwna ma pionowe wzmocnienia zależnie od szerokości.
       </div>
     </div>
   );
