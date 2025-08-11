@@ -125,7 +125,7 @@ function LayoutBlock({
             fontSize={12}
             style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
           >
-            {`${Math.round(gTop)} mm`}
+            {`${gTop.toFixed(2)} mm`}
           </text>
         </g>
       );
@@ -152,7 +152,7 @@ function LayoutBlock({
               fontSize={12}
               style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
             >
-              {`${Math.round(g)} mm`}
+              {`${g.toFixed(2)} mm`}
             </text>
           </g>
         );
@@ -175,7 +175,7 @@ function LayoutBlock({
             fontSize={12}
             style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
           >
-            {`${Math.round(gBottom)} mm`}
+            {`${gBottom.toFixed(2)} mm`}
           </text>
         </g>
       );
@@ -807,7 +807,7 @@ export default function KalkulatorPalisada() {
               <div className="mt-1">Przerwy (lista):</div>
               <div className="flex flex-wrap gap-1">
                 {spanGaps.map((g, i) => (
-                  <span key={i} className="px-2 py-1 bg-slate-100 rounded">{`${g} mm`}</span>
+                <span key={i} className="px-2 py-1 bg-slate-100 rounded">{`${g.toFixed(2)} mm`}</span>
                 ))}
               </div>
             </div>
