@@ -509,12 +509,13 @@ export default function KalkulatorPalisada() {
       const totalWidthMM = (svg.width.baseVal.value) / scale;
       const totalHeightMM = (svg.height.baseVal.value) / scale;
 
-      const targetWpx = fmt2(totalWidthMM * MM_TO_IN * dpi);
-      const targetHpx = fmt2(totalHeightMM * MM_TO_IN * dpi);
+     // piksele MUSZĄ być liczbą całkowitą
+    const targetWpx = Math.round(totalWidthMM * MM_TO_IN * dpi);
+    const targetHpx = Math.round(totalHeightMM * MM_TO_IN * dpi);
 
-      const canvas = document.createElement("canvas");
-      canvas.width = targetWpx;
-      canvas.height = targetHpx;
+    const canvas = document.createElement("canvas");
+    canvas.width = targetWpx;
+    canvas.height = targetHpx;
       const ctx = canvas.getContext("2d")!;
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, targetWpx, targetHpx);
@@ -544,8 +545,8 @@ export default function KalkulatorPalisada() {
       img.onload = () => {
         const totalWidthMM = (svgRef.current!.width.baseVal.value) / scale;
         const totalHeightMM = (svgRef.current!.height.baseVal.value) / scale;
-        const targetWpx = fmt2(totalWidthMM * MM_TO_IN * dpi);
-        const targetHpx = fmt2(totalHeightMM * MM_TO_IN * dpi);
+        const targetWpx = Math.round(totalWidthMM * MM_TO_IN * dpi);
+        const targetHpx = Math.round(totalHeightMM * MM_TO_IN * dpi);
 
         const canvas = document.createElement("canvas");
         canvas.width = targetWpx;
