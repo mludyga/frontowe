@@ -261,7 +261,7 @@ export default function App() {
     if (!gate) return null;
     const p = sum(gate.panels);
     const gsum = sum(gate.gaps);
-    const total = p + gsum + 2 * frameVert; // brama zawsze z ramą
+    const total = p + gsum + 2 * frameVert + gateExtraH; // brama zawsze z ramą
     return { p, gsum, total };
   }, [gate, frameVert]);
 
@@ -407,7 +407,7 @@ export default function App() {
 
   const maxHeightMM = useMemo(() => {
     let h = spanHeight;
-    if (gateType !== "none") h = Math.max(h, gateHeight, wicketHeight);
+    if (gateType !== "none") h = Math.max(h, gateHeight + gateExtraH, wicketHeight);
     return h + TOP_MARGIN_MM + 60;
   }, [spanHeight, gateType, gateHeight, wicketHeight]);
 
@@ -1034,7 +1034,7 @@ export default function App() {
                     scale={scale}
                     frameVert={frameVert}
                     verticalBars={slidingVerticalBars}
-                    bottomSupports={bottomSupports}
+                    bottomSupports={gateBottomEnabled ? { height: gateBottomSupportH, xs: gateBottomXs } : undefined}
                   />
                 </g>
               )
@@ -1079,7 +1079,7 @@ export default function App() {
                       x1={xDeltaGate}
                       x2={xDeltaGate}
                       y1={(TOP_MARGIN_MM + spanHeight) * scale}
-                      y2={(TOP_MARGIN_MM + gateHeight) * scale}
+                      y2={(TOP_MARGIN_MM + (gateHeight + gateExtraH)) * scale}
                       stroke="#333"
                       markerStart="url(#arrowhead)"
                       markerEnd="url(#arrowhead)"
@@ -1091,7 +1091,7 @@ export default function App() {
                       fontSize={12}
                       style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
                     >
-                      {`Δ: ${Math.abs(gateHeight - spanHeight)} mm`}
+                      {`Δ: ${Math.abs(gateHeight + gateExtraH - spanHeight)} mm`}
                     </text>
                   </g>
                 )}
