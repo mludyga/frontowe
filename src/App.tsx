@@ -69,7 +69,7 @@ export default function App() {
   const [gateType, setGateType] = useState<GateType>("none");
   const [gateWidth, setGateWidth] = useState<number>(4000);
   const [gateHeight, setGateHeight] = useState<number>(1400);
-  const [gateEqualBays, setGateEqualBays] = useState<boolean>(true);
+  const [gateEqualBays] = useState<boolean>(true);
 
 
   // Przestrzeń 2 – BRAMA
