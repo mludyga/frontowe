@@ -19,6 +19,7 @@ type LayoutProps = {
   frameVert: number;  // grubość ramy — *ta sama* dla góra/dół/lewo/prawo
   // NEW: dodatkowe pionowe wzmocnienia (np. w bramie przesuwnej)
   verticalBars?: number[]; // pozycje X (w mm, od lewej krawędzi zewnętrznej), szerokość = frameVert
+  bottomSupports?: { height: number; xs: number[] };
 };
 
 const unitFactorToMM: Record<Unit, number> = { mm: 1, cm: 10, in: 25.4 };
