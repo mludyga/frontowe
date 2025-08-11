@@ -1,12 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 
 // === TYPY DANYCH ===
-type Unit = "mm" | "cm" | "in";
-type PanelGroup = { qty: number; t: number; inGate?: boolean };
-type GapMode = "equal" | "custom";
+type PanelGroup = { id: number; qty: number; t: number; inGate?: boolean };
 type GateType = "none" | "skrzydłowa" | "przesuwna";
-type CustomGap = { value: number | null; locked: boolean };
 
 // Nowe typy dla zaawansowanej konstrukcji
 type BottomLayerType = "omega" | "profil" | "wsporniki";
@@ -15,8 +12,7 @@ type BottomLayer = {
   type: BottomLayerType;
   height: number;
   gapAfter: number;
-  // Tylko dla wsporników
-  qty?: number;
+  qty: number; // Zawsze obecne dla spójności
 };
 type AdvancedStructure = {
   bottomLayers: BottomLayer[];
@@ -41,25 +37,20 @@ type LayoutProps = {
   withFrame: boolean;
   gaps: number[];
   panels: number[];
-  scale: number;
   frameVert: number;
   frameHoriz: number;
   // Dodatkowe parametry dla zaawansowanego rysunku
   advancedLayout?: AdvancedLayoutResult | null;
 };
 
-// === STAŁE I FUNKCJE POMOCNICZE ===
+// === FUNKCJE POMOCNICZE ===
 const roundMM = (n: number) => Math.round(n);
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
-// Layout stałe
-const LABEL_COL_MM = 148;
-
 // === GŁÓWNY KOMPONENT RYSUJĄCY ===
 function LayoutBlock({
-  title, outerW, outerH, withFrame, gaps, panels, scale, frameVert, frameHoriz, advancedLayout
+  title, outerW, outerH, withFrame, gaps, panels, frameVert, frameHoriz, advancedLayout
 }: LayoutProps) {
-  const stroke = "#333";
   const fillFrame = "#94a3b8";
   const fillStructure = "#cbd5e1";
   const x0 = 0;
@@ -67,35 +58,23 @@ function LayoutBlock({
   const frameT = withFrame ? frameVert : 0;
   const frameH = withFrame ? frameHoriz : 0;
 
-  function rect(x: number, y: number, w: number, h: number, label?: string, fill = "#ddd", s = "#333", labelSide: "right" | "top" = "right") {
-    const W = w * scale, H = h * scale, X = x * scale, Y = y * scale;
+  function rect(x: number, y: number, w: number, h: number, label?: string, fill = "#ddd", s = "#333") {
+    const W = w, H = h, X = x, Y = y;
     const labelElem = label ? (
-      labelSide === "right" ? (
-        <text x={(x + w) * scale + 10} y={Y + H / 2} dominantBaseline="middle" fontSize={12}
+        <text x={X + W + 10} y={Y + H / 2} dominantBaseline="middle" fontSize={12}
           style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}>
           {label}
         </text>
-      ) : (
-        <text x={X + W / 2} y={Y - 5} textAnchor="middle" fontSize={12}
-          style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}>
-          {label}
-        </text>
-      )
     ) : null;
 
     return <g><rect x={X} y={Y} width={W} height={H} fill={fill} stroke={s} vectorEffect="non-scaling-stroke" />{labelElem}</g>;
   }
 
-  // --- Pełna rama (4 boki) ---
   const frame = withFrame ? (
     <g>
-      {/* Góra */}
       {rect(x0, y0, outerW, frameT, undefined, fillFrame)}
-      {/* Dół */}
       {rect(x0, y0 + outerH - frameT, outerW, frameT, undefined, fillFrame)}
-      {/* Lewy */}
       {rect(x0, y0 + frameT, frameH, outerH - 2 * frameT, undefined, fillFrame)}
-      {/* Prawy */}
       {rect(x0 + outerW - frameH, y0 + frameT, frameH, outerH - 2 * frameT, undefined, fillFrame)}
     </g>
   ) : null;
@@ -104,7 +83,6 @@ function LayoutBlock({
   const innerW = outerW - 2 * frameH;
   const innerX = x0 + frameH;
 
-  // --- Rysowanie standardowego wypełnienia (panele + przerwy) ---
   if (!advancedLayout) {
     let cursorY = frameT + (gaps[0] ?? 0);
     let gapIdx = 1;
@@ -120,13 +98,11 @@ function LayoutBlock({
     }
   }
 
-  // --- Rysowanie zaawansowanej konstrukcji (Brama Przesuwna / Furtka) ---
   if (advancedLayout) {
     const { panels: advPanels, gaps: advGaps, bottomStructureLayout, vertReinforcement } = advancedLayout;
     let cursorY = frameT + (advGaps[0] ?? 0);
     let gapIdx = 1;
 
-    // Rysuj panele palisadowe
     for (let i = 0; i < advPanels.length; i++) {
       const t = advPanels[i];
       elems.push(rect(innerX, cursorY, innerW, t, `${t} mm`));
@@ -137,27 +113,24 @@ function LayoutBlock({
         cursorY += Math.max(0, g);
       }
     }
-     // Przerwa przed konstrukcją dolną
     const gapBeforeBottom = advGaps[advGaps.length - 1] ?? 0;
     if (gapBeforeBottom > 0) {
        elems.push(rect(innerX, cursorY, innerW, Math.max(0, gapBeforeBottom), `${gapBeforeBottom} mm`, "#f1f5f9", "#64748b"));
        cursorY += Math.max(0, gapBeforeBottom);
     }
     
-    // Rysuj konstrukcję dolną
     for (const layer of [...bottomStructureLayout].reverse()) {
         const layerLabel = `${layer.type === 'omega' ? 'Omega' : 'Profil'} ${layer.height}mm`;
         if (layer.type === 'wsporniki') {
             const qty = layer.qty || 0;
             const positions = [];
-            if (qty > 0) positions.push(0); // lewy
-            if (qty > 1) positions.push(innerW - frameH); // prawy
-            if (qty > 2 && vertReinforcement) positions.push((innerW / 2) - (frameH/2)); // srodkowy
+            if (qty > 0) positions.push(0);
+            if (qty > 1) positions.push(innerW - frameH);
+            if (qty > 2 && vertReinforcement) positions.push((innerW / 2) - (frameH/2));
             
             const mainSupports = positions.length;
             const extras = qty - mainSupports;
             if (extras > 0) {
-                // prosta dystrybucja
                 for(let i=0; i < extras; i++) positions.push((i + 1) * (innerW / (extras + 1)) - (frameH/2));
             }
             for (let i=0; i<qty; i++) {
@@ -173,31 +146,23 @@ function LayoutBlock({
         }
     }
     
-    // Rysuj wzmocnienie pionowe
     if(vertReinforcement) {
         elems.push(rect(x0 + outerW/2 - frameH/2, y0 + frameT, frameH, outerH - 2 * frameT, undefined, fillFrame))
     }
   }
   
-  // --- Wymiarowanie ---
   const dims = (
     <g>
-      {/* szerokość całkowita */}
-      <line x1={0} y1={(outerH + 28) * scale} x2={outerW * scale} y2={(outerH + 28) * scale} stroke="#333" markerEnd="url(#arrowhead)" markerStart="url(#arrowhead)" vectorEffect="non-scaling-stroke" />
-      <text x={(outerW * scale) / 2} y={(outerH + 22) * scale} textAnchor="middle" fontSize={12} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}>{`${outerW} mm`}</text>
-
-      {/* wysokość całkowita */}
-      <line x1={(outerW + 28) * scale} y1={0} x2={(outerW + 28) * scale} y2={outerH * scale} stroke="#333" markerEnd="url(#arrowhead)" markerStart="url(#arrowhead)" vectorEffect="non-scaling-stroke" />
-      <text x={(outerW + 36) * scale} y={(outerH * scale) / 2} fontSize={12} transform={`rotate(90 ${(outerW + 36) * scale} ${(outerH * scale) / 2})`} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}>{`${outerH} mm`}</text>
-      
-      {/* szerokość ramy bocznej */}
+      <line x1={0} y1={outerH + 28} x2={outerW} y2={outerH + 28} stroke="#333" markerEnd="url(#arrowhead)" markerStart="url(#arrowhead)" vectorEffect="non-scaling-stroke" />
+      <text x={outerW / 2} y={outerH + 22} textAnchor="middle" fontSize={12} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}>{`${outerW} mm`}</text>
+      <line x1={outerW + 28} y1={0} x2={outerW + 28} y2={outerH} stroke="#333" markerEnd="url(#arrowhead)" markerStart="url(#arrowhead)" vectorEffect="non-scaling-stroke" />
+      <text x={outerW + 36} y={outerH / 2} fontSize={12} transform={`rotate(90 ${outerW + 36} ${outerH / 2})`} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}>{`${outerH} mm`}</text>
       {withFrame && frameH > 0 && (
           <g>
-              <line x1={0} y1={-10 * scale} x2={frameH * scale} y2={-10 * scale} stroke="#333" markerEnd="url(#arrowhead)" markerStart="url(#arrowhead)" vectorEffect="non-scaling-stroke" />
-              <text x={(frameH / 2) * scale} y={-16 * scale} textAnchor="middle" fontSize={12} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}>{`${frameH} mm`}</text>
+              <line x1={0} y1={-10} x2={frameH} y2={-10} stroke="#333" markerEnd="url(#arrowhead)" markerStart="url(#arrowhead)" vectorEffect="non-scaling-stroke" />
+              <text x={frameH / 2} y={-16} textAnchor="middle" fontSize={12} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}>{`${frameH} mm`}</text>
           </g>
       )}
-
       <text x={0} y={-28} fontSize={14} fontWeight={600} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}> {title} </text>
     </g>
   );
@@ -206,30 +171,25 @@ function LayoutBlock({
     <g>
       {elems}
       {frame}
-      <g transform={`translate(0, ${LABEL_COL_MM * scale}) rotate(-90)`}>{dims}</g>
+      {dims}
     </g>
   );
 }
 
 // === GŁÓWNY KOMPONENT APLIKACJI ===
 export default function KalkulatorPalisada() {
-  // --- STAN APLIKACJI ---
   const [spanWidth, setSpanWidth] = useState<number>(2000);
   const [spanHeight, setSpanHeight] = useState<number>(1200);
   const [hasFrame, setHasFrame] = useState<boolean>(true);
   const [frameVert, setFrameVert] = useState<number>(60);
   const [frameHoriz, setFrameHoriz] = useState<number>(60);
-  const [groups, setGroups] = useState<PanelGroup[]>([{ qty: 6, t: 100, inGate: true }]);
-  const [gapMode, setGapMode] = useState<GapMode>("equal");
-  const [customGaps, setCustomGaps] = useState<CustomGap[]>([]);
-
+  const [groups, setGroups] = useState<PanelGroup[]>([{ id: 1, qty: 6, t: 100, inGate: true }]);
   const [gateType, setGateType] = useState<GateType>("przesuwna");
   const [gateWidth, setGateWidth] = useState<number>(4000);
   const [gateHeight, setGateHeight] = useState<number>(1500);
   const [wicketWidth, setWicketWidth] = useState<number>(1000);
   const [wicketHeight, setWicketHeight] = useState<number>(1500);
   
-  // Nowy stan dla zaawansowanej konstrukcji bramy i furtki
   const [gateStructure, setGateStructure] = useState<AdvancedStructure>({ 
     bottomLayers: [
         {id: 1, type: 'omega', height: 80, gapAfter: 10, qty: 1},
@@ -240,10 +200,9 @@ export default function KalkulatorPalisada() {
   const [wicketStructure, setWicketStructure] = useState<AdvancedStructure>({ bottomLayers: [], hasVertReinforcement: false });
 
   const [orderNo, setOrderNo] = useState<string>("");
-  const [scale, setScale] = useState<number>(0.15);
+  const [scale, setScale] = useState<number>(0.25);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
-  // --- MEMOIZOWANE OBLICZENIA ---
   const panelList = useMemo(() => {
     const arr: number[] = [];
     for (const g of groups) for (let i = 0; i < g.qty; i++) arr.push(g.t);
@@ -270,15 +229,6 @@ export default function KalkulatorPalisada() {
     return null;
   }, [nPanels, sumPanels, spanInternalHeight]);
 
-  useEffect(() => {
-    setCustomGaps((prev) => {
-      const expected = gapCountSpan;
-      if (prev.length === expected) return prev;
-      return Array.from({ length: expected }, (_, i) => prev[i] ?? { value: null, locked: false });
-    });
-  }, [gapCountSpan]);
-
-  // Obliczenia przerw dla przęsła (prosta logika)
   const spanCalc = useMemo(() => {
     if (nPanels === 0) return { gaps: [], error: "Brak paneli" };
     if(gapCountSpan <= 0) return { gaps: [], error: ""};
@@ -292,7 +242,6 @@ export default function KalkulatorPalisada() {
   }, [gapCountSpan, spanInternalHeight, sumPanels, nPanels]);
   const spanGaps = spanCalc.gaps;
 
-  // --- NOWA FUNKCJA OBLICZENIOWA DLA BRAM/FURTEK ---
   const computeAdvancedLayout = (
     height: number,
     basePanels: number[],
@@ -307,7 +256,7 @@ export default function KalkulatorPalisada() {
           return { error: "Panele nie mieszczą się w dostępnej wysokości", panels:[], gaps:[], bottomStructureLayout:[], totalBottomHeight:0, availablePanelHeight:0, vertReinforcement:false };
       }
 
-      const numGaps = basePanels.length > 0 ? basePanels.length + 1 : 0; // Przerwa na górze i na dole + między panelami
+      const numGaps = basePanels.length > 0 ? basePanels.length + 1 : 0;
       if (numGaps === 0) {
         return {
             panels: [], gaps: [availablePanelHeight], bottomStructureLayout: structure.bottomLayers, totalBottomHeight, availablePanelHeight, vertReinforcement: structure.hasVertReinforcement,
@@ -318,7 +267,6 @@ export default function KalkulatorPalisada() {
       if(gapSize < 0) return { error: "Układ niemożliwy - ujemne przerwy", panels:[], gaps:[], bottomStructureLayout:[], totalBottomHeight:0, availablePanelHeight:0, vertReinforcement:false };
       
       const gaps = Array(numGaps).fill(roundMM(gapSize));
-      // Prosta korekta zaokrągleń
       const currentSum = sum(gaps) + sumBasePanels;
       const correction = availablePanelHeight - currentSum;
       if(gaps.length > 0) gaps[gaps.length - 1] = roundMM(gaps[gaps.length - 1] + correction);
@@ -338,18 +286,14 @@ export default function KalkulatorPalisada() {
       if (gateType === 'przesuwna') {
           return computeAdvancedLayout(gateHeight, panelsForGate, gateStructure);
       }
-      // TODO: Dodać logikę dla bramy skrzydłowej
       return null;
   }, [gateType, gateHeight, panelsForGate, gateStructure, frameVert]);
   
   const wicketLayout = useMemo(() => {
       if (gateType === 'none') return null;
-       // Furtka zawsze ma elastyczną budowę
       return computeAdvancedLayout(wicketHeight, panelsForGate, wicketStructure);
   }, [gateType, wicketHeight, panelsForGate, wicketStructure, frameVert]);
 
-
-  // === FUNKCJE OBSŁUGI UI ===
   const handleFramePreset = (v: number) => {
       setFrameVert(v);
       setFrameHoriz(v);
@@ -383,7 +327,7 @@ export default function KalkulatorPalisada() {
             {structure.bottomLayers.map(layer => (
                 <div key={layer.id} className="p-2 border rounded bg-gray-50 text-sm space-y-1">
                     <div className="flex justify-between items-center">
-                        <select value={layer.type} onChange={e => updateBottomLayer(target, layer.id, 'type', e.target.value)} className="input !p-1 !text-sm">
+                        <select value={layer.type} onChange={e => updateBottomLayer(target, layer.id, 'type', e.target.value as BottomLayerType)} className="input !p-1 !text-sm">
                             <option value="profil">Profil</option>
                             <option value="omega">Omega</option>
                             <option value="wsporniki">Wsporniki</option>
@@ -401,11 +345,10 @@ export default function KalkulatorPalisada() {
     )
   }
 
-  // --- RENDEROWANIE KOMPONENTU ---
   const totalWidth = useMemo(() => {
-    let w = spanWidth + 150;
-    if (gateType !== 'none') w += gateWidth + 50;
-    if (gateType !== 'none') w += wicketWidth + 50;
+    let w = spanWidth + 200; // margin
+    if (gateType !== 'none') w += gateWidth + 150;
+    if (gateType !== 'none') w += wicketWidth + 150;
     return w;
   }, [spanWidth, gateType, gateWidth, wicketWidth]);
 
@@ -413,7 +356,7 @@ export default function KalkulatorPalisada() {
 
   return (
     <div className="p-4 space-y-4 bg-gray-50">
-      <h1 className="text-2xl font-bold">Kalkulator Ogrodzeń (v2.1)</h1>
+      <h1 className="text-2xl font-bold">Kalkulator Ogrodzeń v2.2</h1>
 
       <div className="grid lg:grid-cols-3 gap-4">
         {/* Kolumna 1: Przęsło i Panele */}
@@ -451,14 +394,14 @@ export default function KalkulatorPalisada() {
 
             <div>
                 <div className="font-semibold">Grupy paneli</div>
-                 {groups.map((g, idx) => (
-                    <div key={idx} className="grid grid-cols-3 gap-2 items-end mt-2">
-                        <label className="block">Ilość <input type="number" className="input" value={g.qty} min={1} onChange={(e) => { const v = e.currentTarget.valueAsNumber || 0; const next = [...groups]; next[idx] = { ...g, qty: v }; setGroups(next); }} /></label>
-                        <label className="block">Wys. (mm) <input type="number" className="input" value={g.t} min={1} onChange={(e) => { const v = e.currentTarget.valueAsNumber || 0; const next = [...groups]; next[idx] = { ...g, t: v }; setGroups(next); }} /></label>
-                        <button className="px-2 py-1 border rounded text-xs" onClick={() => setGroups(groups.filter((_, i) => i !== idx))}>Usuń</button>
+                 {groups.map((g) => (
+                    <div key={g.id} className="grid grid-cols-3 gap-2 items-end mt-2">
+                        <label className="block">Ilość <input type="number" className="input" value={g.qty} min={1} onChange={(e) => { const v = e.currentTarget.valueAsNumber || 0; setGroups(groups.map(gr => gr.id === g.id ? {...gr, qty: v} : gr)); }} /></label>
+                        <label className="block">Wys. (mm) <input type="number" className="input" value={g.t} min={1} onChange={(e) => { const v = e.currentTarget.valueAsNumber || 0; setGroups(groups.map(gr => gr.id === g.id ? {...gr, t: v} : gr)); }} /></label>
+                        <button className="px-2 py-1 border rounded text-xs" onClick={() => setGroups(groups.filter((gr) => gr.id !== g.id))}>Usuń</button>
                     </div>
                  ))}
-                 <button className="mt-2 px-3 py-1 border rounded text-sm" onClick={() => setGroups([...groups, { qty: 1, t: 100, inGate: true }])}>+ Dodaj grupę</button>
+                 <button className="mt-2 px-3 py-1 border rounded text-sm" onClick={() => setGroups([...groups, { id: Date.now(), qty: 1, t: 100, inGate: true }])}>+ Dodaj grupę</button>
             </div>
         </div>
 
@@ -468,7 +411,7 @@ export default function KalkulatorPalisada() {
             <div className="flex items-center gap-4">
                 <label><input type="radio" name="gate" value="none" checked={gateType==='none'} onChange={e=>setGateType(e.target.value as GateType)}/> Brak</label>
                 <label><input type="radio" name="gate" value="przesuwna" checked={gateType==='przesuwna'} onChange={e=>setGateType(e.target.value as GateType)}/> Przesuwna</label>
-                <label><input type="radio" name="gate" value="skrzydłowa" checked={gateType==='skrzydłowa'} onChange={e=>setGateType(e.target.value as GateType)}/> Skrzydłowa</label>
+                <label><input type="radio" name="gate" value="skrzydłowa" disabled title="Wkrótce" checked={gateType==='skrzydłowa'} onChange={e=>setGateType(e.target.value as GateType)}/> Skrzydłowa</label>
             </div>
 
             {gateType !== 'none' && (
@@ -505,67 +448,77 @@ export default function KalkulatorPalisada() {
             <h2 className="font-semibold text-lg">3. Podsumowanie i Błędy</h2>
             {baseError && <div className="p-2 bg-red-100 text-red-700 rounded">{baseError}</div>}
             {spanCalc.error && <div className="p-2 bg-red-100 text-red-700 rounded">{spanCalc.error}</div>}
-            {gateLayout?.error && <div className="p-2 bg-red-100 text-red-700 rounded">BŁĄD BRAMY: {gateLayout.error}</div>}
-            {wicketLayout?.error && <div className="p-2 bg-red-100 text-red-700 rounded">BŁĄD FURTKI: {wicketLayout.error}</div>}
+            {gateLayout?.error && <div className="p-2 bg-yellow-100 text-yellow-800 rounded">BRAMA: {gateLayout.error}</div>}
+            {wicketLayout?.error && <div className="p-2 bg-yellow-100 text-yellow-800 rounded">FURTKA: {wicketLayout.error}</div>}
         </div>
       </div>
       
+      <div className="p-3 rounded-xl border bg-white shadow-sm flex items-center gap-4">
+        <label className="block">
+            <span className="text-sm font-medium">Nr zlecenia</span>
+            <input type="text" className="input" value={orderNo} onChange={e => setOrderNo(e.target.value)} />
+        </label>
+        <label className="block">
+            <span className="text-sm font-medium">Skala podglądu</span>
+            <input type="range" min={0.05} max={0.5} step={0.01} value={scale} onChange={e => setScale(e.target.valueAsNumber || 0.2)} />
+        </label>
+      </div>
+
       {/* Rysunek */}
       <div className="p-3 rounded-xl border overflow-auto bg-white shadow-lg">
-          <svg ref={svgRef} width={totalWidth * scale} height={maxHeight * scale} viewBox={`0 0 ${totalWidth} ${maxHeight}`}>
-            <defs>
-                <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
-                    <path d="M0,0 L6,3 L0,6 z" fill="#333" />
-                </marker>
-            </defs>
+          <svg ref={svgRef} width={totalWidth * scale} height={maxHeight * scale}>
+            <g transform={`scale(${scale})`}>
+                <defs>
+                    <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+                        <path d="M0,0 L6,3 L0,6 z" fill="#333" />
+                    </marker>
+                </defs>
 
-            <g transform={`translate(150, 50)`}>
-                <LayoutBlock
-                  title="Przęsło"
-                  outerW={spanWidth}
-                  outerH={spanHeight}
-                  withFrame={hasFrame}
-                  gaps={spanGaps}
-                  panels={panelList}
-                  scale={1}
-                  frameVert={frameVert}
-                  frameHoriz={frameHoriz}
-                />
-            </g>
-
-            {gateType === 'przesuwna' && gateLayout && (
-                <g transform={`translate(${150 + spanWidth + 100}, 50)`}>
+                <g transform={`translate(150, 50)`}>
                     <LayoutBlock
-                        title="Brama Przesuwna"
-                        outerW={gateWidth}
-                        outerH={gateHeight}
-                        withFrame={true}
-                        gaps={[]}
-                        panels={[]}
-                        scale={1}
-                        frameVert={frameVert}
-                        frameHoriz={frameHoriz}
-                        advancedLayout={gateLayout}
+                    title="Przęsło"
+                    outerW={spanWidth}
+                    outerH={spanHeight}
+                    withFrame={hasFrame}
+                    gaps={spanGaps}
+                    panels={panelList}
+                    frameVert={frameVert}
+                    frameHoriz={frameHoriz}
                     />
                 </g>
-            )}
 
-            {gateType !== 'none' && wicketLayout && (
-                 <g transform={`translate(${150 + spanWidth + 100 + gateWidth + 100}, 50)`}>
-                     <LayoutBlock
-                        title="Furtka"
-                        outerW={wicketWidth}
-                        outerH={wicketHeight}
-                        withFrame={true}
-                        gaps={[]}
-                        panels={[]}
-                        scale={1}
-                        frameVert={frameVert}
-                        frameHoriz={frameHoriz}
-                        advancedLayout={wicketLayout}
-                    />
-                 </g>
-            )}
+                {gateType === 'przesuwna' && gateLayout && !gateLayout.error && (
+                    <g transform={`translate(${150 + spanWidth + 100}, 50)`}>
+                        <LayoutBlock
+                            title="Brama Przesuwna"
+                            outerW={gateWidth}
+                            outerH={gateHeight}
+                            withFrame={true}
+                            gaps={[]}
+                            panels={[]}
+                            frameVert={frameVert}
+                            frameHoriz={frameHoriz}
+                            advancedLayout={gateLayout}
+                        />
+                    </g>
+                )}
+
+                {gateType !== 'none' && wicketLayout && !wicketLayout.error && (
+                    <g transform={`translate(${150 + spanWidth + 100 + (gateType === 'przesuwna' ? gateWidth + 100 : 0)}, 50)`}>
+                        <LayoutBlock
+                            title="Furtka"
+                            outerW={wicketWidth}
+                            outerH={wicketHeight}
+                            withFrame={true}
+                            gaps={[]}
+                            panels={[]}
+                            frameVert={frameVert}
+                            frameHoriz={frameHoriz}
+                            advancedLayout={wicketLayout}
+                        />
+                    </g>
+                )}
+            </g>
           </svg>
       </div>
     </div>
