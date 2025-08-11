@@ -155,7 +155,6 @@ function LayoutBlock({
 
   // górna/dolna rama
   // UWAGA: dolna rama idzie nad sekcją dolną – sekcja dolna „siedzi” w przestrzeni wewnętrznej
-  const innerHeight = outerH - topFrame - bottomFrame;
   const frameTopRect = rect(x0 + leftFrame, y0, outerW - leftFrame - rightFrame, topFrame, fillFrame);
   const frameBottomRect = rect(x0 + leftFrame, y0 + outerH - bottomFrame, outerW - leftFrame - rightFrame, bottomFrame, fillFrame);
 
@@ -440,7 +439,7 @@ function BottomStackEditor({ title, items, setItems, presets = ["omega+profile",
         <div className="text-xs text-gray-500">Brak pozycji.</div>
       ) : (
         <div className="space-y-2">
-          {items.map((it, i) => (
+          {items.map((it) => (
             <div key={it.id} className="grid grid-cols-[1fr_120px_120px_120px] gap-2 items-end">
               <div className="text-sm">
                 {it.label ?? it.kind}
