@@ -49,29 +49,11 @@ type LayoutProps = {
 };
 
 // === STAŁE I FUNKCJE POMOCNICZE ===
-const unitFactorToMM: Record<Unit, number> = { mm: 1, cm: 10, in: 25.4 };
-const toMM = (v: number, unit: Unit) => v * unitFactorToMM[unit];
-const fromMM = (vmm: number, unit: Unit) => vmm / unitFactorToMM[unit];
 const roundMM = (n: number) => Math.round(n);
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
-const parseNumber = (raw: string) => {
-  if (raw.trim() === "") return NaN;
-  const v = Number(raw.replace(",", "."));
-  return isFinite(v) ? v : NaN;
-};
-
-function distributeAutoGaps(leftover: number, autos: number, weights?: number[]): number[] {
-  if (autos <= 0) return [];
-  if (!weights || weights.length === 0) return Array(autos).fill(leftover / autos);
-  const wsum = sum(weights);
-  if (wsum <= 0) return Array(autos).fill(leftover / autos);
-  return weights.map((w) => (w / wsum) * leftover);
-}
 
 // Layout stałe
 const LABEL_COL_MM = 148;
-const MODULE_GUTTER_MM = 180;
-const TOP_MARGIN_MM = 446;
 
 // === GŁÓWNY KOMPONENT RYSUJĄCY ===
 function LayoutBlock({
@@ -167,10 +149,15 @@ function LayoutBlock({
         const layerLabel = `${layer.type === 'omega' ? 'Omega' : 'Profil'} ${layer.height}mm`;
         if (layer.type === 'wsporniki') {
             const qty = layer.qty || 0;
-            const positions = [0, (innerW / 2) - (frameH/2), innerW - frameH]; // Lewy, środek, prawy
-            const extras = qty - positions.length;
+            const positions = [];
+            if (qty > 0) positions.push(0); // lewy
+            if (qty > 1) positions.push(innerW - frameH); // prawy
+            if (qty > 2 && vertReinforcement) positions.push((innerW / 2) - (frameH/2)); // srodkowy
+            
+            const mainSupports = positions.length;
+            const extras = qty - mainSupports;
             if (extras > 0) {
-                 // prosta dystrybucja
+                // prosta dystrybucja
                 for(let i=0; i < extras; i++) positions.push((i + 1) * (innerW / (extras + 1)) - (frameH/2));
             }
             for (let i=0; i<qty; i++) {
@@ -227,7 +214,6 @@ function LayoutBlock({
 // === GŁÓWNY KOMPONENT APLIKACJI ===
 export default function KalkulatorPalisada() {
   // --- STAN APLIKACJI ---
-  const [unit, setUnit] = useState<Unit>("mm");
   const [spanWidth, setSpanWidth] = useState<number>(2000);
   const [spanHeight, setSpanHeight] = useState<number>(1200);
   const [hasFrame, setHasFrame] = useState<boolean>(true);
@@ -237,18 +223,24 @@ export default function KalkulatorPalisada() {
   const [gapMode, setGapMode] = useState<GapMode>("equal");
   const [customGaps, setCustomGaps] = useState<CustomGap[]>([]);
 
-  const [gateType, setGateType] = useState<GateType>("none");
+  const [gateType, setGateType] = useState<GateType>("przesuwna");
   const [gateWidth, setGateWidth] = useState<number>(4000);
   const [gateHeight, setGateHeight] = useState<number>(1500);
   const [wicketWidth, setWicketWidth] = useState<number>(1000);
   const [wicketHeight, setWicketHeight] = useState<number>(1500);
   
   // Nowy stan dla zaawansowanej konstrukcji bramy i furtki
-  const [gateStructure, setGateStructure] = useState<AdvancedStructure>({ bottomLayers: [], hasVertReinforcement: false });
+  const [gateStructure, setGateStructure] = useState<AdvancedStructure>({ 
+    bottomLayers: [
+        {id: 1, type: 'omega', height: 80, gapAfter: 10, qty: 1},
+        {id: 2, type: 'profil', height: 60, gapAfter: 20, qty: 1},
+    ], 
+    hasVertReinforcement: true 
+  });
   const [wicketStructure, setWicketStructure] = useState<AdvancedStructure>({ bottomLayers: [], hasVertReinforcement: false });
 
   const [orderNo, setOrderNo] = useState<string>("");
-  const [scale, setScale] = useState<number>(0.2);
+  const [scale, setScale] = useState<number>(0.15);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   // --- MEMOIZOWANE OBLICZENIA ---
@@ -286,11 +278,18 @@ export default function KalkulatorPalisada() {
     });
   }, [gapCountSpan]);
 
-  // Obliczenia przerw dla przęsła (logika bez zmian)
+  // Obliczenia przerw dla przęsła (prosta logika)
   const spanCalc = useMemo(() => {
-    // ... (istniejąca logika obliczania przerw przęsła)
-    return { gaps: Array(gapCountSpan).fill((spanInternalHeight - sumPanels)/gapCountSpan), error: "" };
-  }, [gapCountSpan, spanInternalHeight, sumPanels /*... reszta zależności*/]);
+    if (nPanels === 0) return { gaps: [], error: "Brak paneli" };
+    if(gapCountSpan <= 0) return { gaps: [], error: ""};
+    const gapSize = (spanInternalHeight - sumPanels) / gapCountSpan;
+    if (gapSize < 0) return { gaps: [], error: "Panele za wysokie"};
+    const gaps = Array(gapCountSpan).fill(roundMM(gapSize));
+    const currentSum = sum(gaps) + sumPanels;
+    const correction = spanInternalHeight - currentSum;
+    if(gaps.length > 0) gaps[gaps.length - 1] = roundMM(gaps[gaps.length - 1] + correction);
+    return { gaps, error: "" };
+  }, [gapCountSpan, spanInternalHeight, sumPanels, nPanels]);
   const spanGaps = spanCalc.gaps;
 
   // --- NOWA FUNKCJA OBLICZENIOWA DLA BRAM/FURTEK ---
@@ -308,14 +307,21 @@ export default function KalkulatorPalisada() {
           return { error: "Panele nie mieszczą się w dostępnej wysokości", panels:[], gaps:[], bottomStructureLayout:[], totalBottomHeight:0, availablePanelHeight:0, vertReinforcement:false };
       }
 
-      const numGaps = basePanels.length + 1; // Zawsze przerwa na górze i na dole
+      const numGaps = basePanels.length > 0 ? basePanels.length + 1 : 0; // Przerwa na górze i na dole + między panelami
+      if (numGaps === 0) {
+        return {
+            panels: [], gaps: [availablePanelHeight], bottomStructureLayout: structure.bottomLayers, totalBottomHeight, availablePanelHeight, vertReinforcement: structure.hasVertReinforcement,
+        }
+      }
+
       const gapSize = (availablePanelHeight - sumBasePanels) / numGaps;
+      if(gapSize < 0) return { error: "Układ niemożliwy - ujemne przerwy", panels:[], gaps:[], bottomStructureLayout:[], totalBottomHeight:0, availablePanelHeight:0, vertReinforcement:false };
       
       const gaps = Array(numGaps).fill(roundMM(gapSize));
       // Prosta korekta zaokrągleń
       const currentSum = sum(gaps) + sumBasePanels;
       const correction = availablePanelHeight - currentSum;
-      if(gaps.length > 0) gaps[gaps.length - 1] += correction;
+      if(gaps.length > 0) gaps[gaps.length - 1] = roundMM(gaps[gaps.length - 1] + correction);
 
       return {
           panels: basePanels,
@@ -332,7 +338,7 @@ export default function KalkulatorPalisada() {
       if (gateType === 'przesuwna') {
           return computeAdvancedLayout(gateHeight, panelsForGate, gateStructure);
       }
-      // TODO: Dodać logikę dla bramy skrzydłowej, jeśli potrzebna inna niż przęsło
+      // TODO: Dodać logikę dla bramy skrzydłowej
       return null;
   }, [gateType, gateHeight, panelsForGate, gateStructure, frameVert]);
   
@@ -350,7 +356,7 @@ export default function KalkulatorPalisada() {
   }
 
   const addBottomLayer = (target: 'gate' | 'wicket') => {
-      const newLayer: BottomLayer = { id: Date.now(), type: 'profil', height: 60, gapAfter: 20 };
+      const newLayer: BottomLayer = { id: Date.now(), type: 'profil', height: 60, gapAfter: 20, qty: 1 };
       if (target === 'gate') {
           setGateStructure(s => ({ ...s, bottomLayers: [...s.bottomLayers, newLayer] }));
       } else {
@@ -371,16 +377,54 @@ export default function KalkulatorPalisada() {
     setter(s => ({ ...s, bottomLayers: s.bottomLayers.filter(l => l.id !== id) }));
   }
 
+  const renderBottomLayerControls = (target: 'gate' | 'wicket', structure: AdvancedStructure) => {
+    return (
+        <div className="space-y-2 mt-2 border-l-2 pl-2 border-gray-200">
+            {structure.bottomLayers.map(layer => (
+                <div key={layer.id} className="p-2 border rounded bg-gray-50 text-sm space-y-1">
+                    <div className="flex justify-between items-center">
+                        <select value={layer.type} onChange={e => updateBottomLayer(target, layer.id, 'type', e.target.value)} className="input !p-1 !text-sm">
+                            <option value="profil">Profil</option>
+                            <option value="omega">Omega</option>
+                            <option value="wsporniki">Wsporniki</option>
+                        </select>
+                        <button className="px-2 py-1 border rounded text-xs hover:bg-red-100" onClick={() => removeBottomLayer(target, layer.id)}>Usuń</button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <label>Wysokość (mm) <input type="number" value={layer.height} onChange={e => updateBottomLayer(target, layer.id, 'height', e.target.valueAsNumber || 0)} className="input"/></label>
+                        <label>Przerwa nad (mm) <input type="number" value={layer.gapAfter} onChange={e => updateBottomLayer(target, layer.id, 'gapAfter', e.target.valueAsNumber || 0)} className="input"/></label>
+                    </div>
+                    {layer.type === 'wsporniki' && <label>Ilość <input type="number" min={1} value={layer.qty} onChange={e => updateBottomLayer(target, layer.id, 'qty', e.target.valueAsNumber || 1)} className="input"/></label>}
+                </div>
+            ))}
+        </div>
+    )
+  }
+
   // --- RENDEROWANIE KOMPONENTU ---
+  const totalWidth = useMemo(() => {
+    let w = spanWidth + 150;
+    if (gateType !== 'none') w += gateWidth + 50;
+    if (gateType !== 'none') w += wicketWidth + 50;
+    return w;
+  }, [spanWidth, gateType, gateWidth, wicketWidth]);
+
+  const maxHeight = useMemo(() => Math.max(spanHeight, gateHeight, wicketHeight) + 200, [spanHeight, gateHeight, wicketHeight]);
+
   return (
     <div className="p-4 space-y-4 bg-gray-50">
-      <h1 className="text-2xl font-bold">Kalkulator Ogrodzeń (v2.0)</h1>
+      <h1 className="text-2xl font-bold">Kalkulator Ogrodzeń (v2.1)</h1>
 
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid lg:grid-cols-3 gap-4">
         {/* Kolumna 1: Przęsło i Panele */}
         <div className="space-y-4 p-3 rounded-xl border bg-white shadow-sm">
             <h2 className="font-semibold text-lg">1. Konfiguracja Przęsła i Paneli</h2>
-            
+            <label className="block">Szerokość przęsła (mm)
+                <input type="number" className="input" value={spanWidth} onChange={(e) => setSpanWidth(e.currentTarget.valueAsNumber || 0)} />
+            </label>
+            <label className="block">Wysokość przęsła (mm)
+                <input type="number" className="input" value={spanHeight} onChange={(e) => setSpanHeight(e.currentTarget.valueAsNumber || 0)} />
+            </label>
             <div>
                 <div className="font-semibold">Rama</div>
                 <label className="flex items-center gap-2 mt-2">
@@ -407,7 +451,14 @@ export default function KalkulatorPalisada() {
 
             <div>
                 <div className="font-semibold">Grupy paneli</div>
-                {/* ... (istniejący kod dla grup paneli) ... */}
+                 {groups.map((g, idx) => (
+                    <div key={idx} className="grid grid-cols-3 gap-2 items-end mt-2">
+                        <label className="block">Ilość <input type="number" className="input" value={g.qty} min={1} onChange={(e) => { const v = e.currentTarget.valueAsNumber || 0; const next = [...groups]; next[idx] = { ...g, qty: v }; setGroups(next); }} /></label>
+                        <label className="block">Wys. (mm) <input type="number" className="input" value={g.t} min={1} onChange={(e) => { const v = e.currentTarget.valueAsNumber || 0; const next = [...groups]; next[idx] = { ...g, t: v }; setGroups(next); }} /></label>
+                        <button className="px-2 py-1 border rounded text-xs" onClick={() => setGroups(groups.filter((_, i) => i !== idx))}>Usuń</button>
+                    </div>
+                 ))}
+                 <button className="mt-2 px-3 py-1 border rounded text-sm" onClick={() => setGroups([...groups, { qty: 1, t: 100, inGate: true }])}>+ Dodaj grupę</button>
             </div>
         </div>
 
@@ -415,67 +466,53 @@ export default function KalkulatorPalisada() {
         <div className="space-y-4 p-3 rounded-xl border bg-white shadow-sm">
             <h2 className="font-semibold text-lg">2. Brama i Furtka</h2>
             <div className="flex items-center gap-4">
-                {/* ... (przełączniki typu bramy) ... */}
+                <label><input type="radio" name="gate" value="none" checked={gateType==='none'} onChange={e=>setGateType(e.target.value as GateType)}/> Brak</label>
+                <label><input type="radio" name="gate" value="przesuwna" checked={gateType==='przesuwna'} onChange={e=>setGateType(e.target.value as GateType)}/> Przesuwna</label>
+                <label><input type="radio" name="gate" value="skrzydłowa" checked={gateType==='skrzydłowa'} onChange={e=>setGateType(e.target.value as GateType)}/> Skrzydłowa</label>
             </div>
 
-            {gateType === 'przesuwna' && (
-                <div>
-                    <h3 className="font-medium mt-4">Konfiguracja Bramy Przesuwnej</h3>
-                    <label className="flex items-center gap-2 mt-2">
-                        <input type="checkbox" checked={gateStructure.hasVertReinforcement} onChange={e => setGateStructure(s => ({...s, hasVertReinforcement: e.target.checked}))} />
-                        <span>Dodaj wzmocnienie pionowe na środku</span>
-                    </label>
-
-                    <h4 className="font-medium mt-4 text-sm">Konstrukcja dolna (od dołu do góry):</h4>
-                    <div className="space-y-2 mt-2 border-l-2 pl-2 border-gray-200">
-                        {gateStructure.bottomLayers.map(layer => (
-                            <div key={layer.id} className="p-2 border rounded bg-gray-50 text-sm space-y-1">
-                                <div className="flex justify-between items-center">
-                                    <select value={layer.type} onChange={e => updateBottomLayer('gate', layer.id, 'type', e.target.value)} className="input !p-1 !text-sm">
-                                        <option value="profil">Profil</option>
-                                        <option value="omega">Omega</option>
-                                        <option value="wsporniki">Wsporniki</option>
-                                    </select>
-                                    <button className="px-2 py-1 border rounded text-xs" onClick={() => removeBottomLayer('gate', layer.id)}>Usuń</button>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <label>Wysokość (mm) <input type="number" value={layer.height} onChange={e => updateBottomLayer('gate', layer.id, 'height', e.target.valueAsNumber || 0)} className="input"/></label>
-                                    <label>Przerwa nad (mm) <input type="number" value={layer.gapAfter} onChange={e => updateBottomLayer('gate', layer.id, 'gapAfter', e.target.valueAsNumber || 0)} className="input"/></label>
-                                </div>
-                                {layer.type === 'wsporniki' && <label>Ilość <input type="number" value={layer.qty} onChange={e => updateBottomLayer('gate', layer.id, 'qty', e.target.valueAsNumber || 0)} className="input"/></label>}
-                            </div>
-                        ))}
+            {gateType !== 'none' && (
+            <>
+                {gateType === 'przesuwna' && (
+                    <div>
+                        <h3 className="font-medium mt-4">Konfiguracja Bramy Przesuwnej</h3>
+                        <label className="block">Szerokość bramy (mm) <input type="number" className="input" value={gateWidth} onChange={e => setGateWidth(e.target.valueAsNumber || 0)} /></label>
+                        <label className="block">Wysokość bramy (mm) <input type="number" className="input" value={gateHeight} onChange={e => setGateHeight(e.target.valueAsNumber || 0)} /></label>
+                        <label className="flex items-center gap-2 mt-2">
+                            <input type="checkbox" checked={gateStructure.hasVertReinforcement} onChange={e => setGateStructure(s => ({...s, hasVertReinforcement: e.target.checked}))} />
+                            <span>Dodaj wzmocnienie pionowe na środku</span>
+                        </label>
+                        <h4 className="font-medium mt-4 text-sm">Konstrukcja dolna (od dołu do góry):</h4>
+                        {renderBottomLayerControls('gate', gateStructure)}
+                        <button className="mt-2 px-3 py-1 border rounded text-sm" onClick={() => addBottomLayer('gate')}>+ Dodaj warstwę konstrukcji</button>
                     </div>
-                    <button className="mt-2 px-3 py-1 border rounded text-sm" onClick={() => addBottomLayer('gate')}>+ Dodaj warstwę konstrukcji</button>
-                </div>
-            )}
-            
-             {gateType !== 'none' && (
+                )}
+                
                 <div>
                     <h3 className="font-medium mt-4">Konfiguracja Furtki</h3>
-                     <h4 className="font-medium mt-4 text-sm">Konstrukcja dolna furtki (od dołu do góry):</h4>
-                    {/* Tutaj identyczny konfigurator jak dla bramy, ale operujący na wicketStructure */}
-                    <div className="space-y-2 mt-2 border-l-2 pl-2 border-gray-200">
-                        {wicketStructure.bottomLayers.map(layer => (
-                            <div key={layer.id} className="p-2 border rounded bg-gray-50 text-sm space-y-1">
-                                 {/* ... (kod kontrolek warstwy, operujący na wicketStructure) ... */}
-                            </div>
-                        ))}
-                    </div>
+                    <label className="block">Szerokość furtki (mm) <input type="number" className="input" value={wicketWidth} onChange={e => setWicketWidth(e.target.valueAsNumber || 0)} /></label>
+                    <label className="block">Wysokość furtki (mm) <input type="number" className="input" value={wicketHeight} onChange={e => setWicketHeight(e.target.valueAsNumber || 0)} /></label>
+                    <h4 className="font-medium mt-4 text-sm">Konstrukcja dolna furtki (od dołu do góry):</h4>
+                    {renderBottomLayerControls('wicket', wicketStructure)}
                     <button className="mt-2 px-3 py-1 border rounded text-sm" onClick={() => addBottomLayer('wicket')}>+ Dodaj warstwę konstrukcji</button>
                 </div>
-             )}
+            </>
+            )}
         </div>
 
         {/* Kolumna 3: Podsumowanie */}
         <div className="space-y-2 p-3 rounded-xl border bg-white shadow-sm text-sm">
-            {/* ... (istniejące podsumowanie, można je rozbudować o nowe dane) ... */}
+            <h2 className="font-semibold text-lg">3. Podsumowanie i Błędy</h2>
+            {baseError && <div className="p-2 bg-red-100 text-red-700 rounded">{baseError}</div>}
+            {spanCalc.error && <div className="p-2 bg-red-100 text-red-700 rounded">{spanCalc.error}</div>}
+            {gateLayout?.error && <div className="p-2 bg-red-100 text-red-700 rounded">BŁĄD BRAMY: {gateLayout.error}</div>}
+            {wicketLayout?.error && <div className="p-2 bg-red-100 text-red-700 rounded">BŁĄD FURTKI: {wicketLayout.error}</div>}
         </div>
       </div>
       
       {/* Rysunek */}
       <div className="p-3 rounded-xl border overflow-auto bg-white shadow-lg">
-          <svg ref={svgRef} width={1200} height={600} viewBox={`0 0 ${1200/scale} ${600/scale}`}>
+          <svg ref={svgRef} width={totalWidth * scale} height={maxHeight * scale} viewBox={`0 0 ${totalWidth} ${maxHeight}`}>
             <defs>
                 <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
                     <path d="M0,0 L6,3 L0,6 z" fill="#333" />
@@ -490,14 +527,14 @@ export default function KalkulatorPalisada() {
                   withFrame={hasFrame}
                   gaps={spanGaps}
                   panels={panelList}
-                  scale={scale}
+                  scale={1}
                   frameVert={frameVert}
                   frameHoriz={frameHoriz}
                 />
             </g>
 
             {gateType === 'przesuwna' && gateLayout && (
-                <g transform={`translate(150 + ${spanWidth*scale + 100}, 50)`}>
+                <g transform={`translate(${150 + spanWidth + 100}, 50)`}>
                     <LayoutBlock
                         title="Brama Przesuwna"
                         outerW={gateWidth}
@@ -505,7 +542,7 @@ export default function KalkulatorPalisada() {
                         withFrame={true}
                         gaps={[]}
                         panels={[]}
-                        scale={scale}
+                        scale={1}
                         frameVert={frameVert}
                         frameHoriz={frameHoriz}
                         advancedLayout={gateLayout}
@@ -514,7 +551,7 @@ export default function KalkulatorPalisada() {
             )}
 
             {gateType !== 'none' && wicketLayout && (
-                 <g transform={`translate(150 + ${(spanWidth + gateWidth)*scale + 200}, 50)`}>
+                 <g transform={`translate(${150 + spanWidth + 100 + gateWidth + 100}, 50)`}>
                      <LayoutBlock
                         title="Furtka"
                         outerW={wicketWidth}
@@ -522,7 +559,7 @@ export default function KalkulatorPalisada() {
                         withFrame={true}
                         gaps={[]}
                         panels={[]}
-                        scale={scale}
+                        scale={1}
                         frameVert={frameVert}
                         frameHoriz={frameHoriz}
                         advancedLayout={wicketLayout}
