@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import LayoutBlock, { LABEL_COL_MM } from "./components/LayoutBlock";
 import { toMM, fromMM, type Unit } from "./utils/units";
 import { round2, fmt2 } from "./utils/math";-
-type Unit = "mm" | "cm" | "in";
 type PanelGroup = { qty: number; t: number; inGate?: boolean };
 type GapMode = "equal" | "custom";
 type GateType = "none" | "skrzydłowa" | "przesuwna";
