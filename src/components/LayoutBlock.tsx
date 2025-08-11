@@ -2,31 +2,33 @@ import type { JSX } from "react";
 
 export type LayoutProps = {
   title: string;
-  outerW: number;            // całkowita szerokość (z ramami lewo/prawo)
-  outerH: number;            // wysokość korpusu (do dolnej ramy)
-  withFrame: boolean;        // rysować ramę 4-stronną
-  gaps: number[];            // przerwy pionowe: [top, mid..., bottom] gdy withFrame; inaczej: mid...
-  panels: number[];          // wysokości paneli (pionowy stos)
+  outerW: number;            // szerokość modułu (rama wliczona)
+  outerH: number;            // wysokość modułu (rama wliczona)
+  withFrame: boolean;
+  gaps: number[];            // [top, mid..., bottom] gdy withFrame, w pp. same midy
+  panels: number[];
   scale: number;
-  frameVert: number;         // grubość ramy (ta sama na wszystkich krawędziach)
+  frameVert: number;         // grubość ramy (ta sama na 4 krawędziach)
 
-  // Dodatkowe elementy:
-  verticalBars?: number[];   // pozycje X (mm od lewej zewnętrznej), szer. = frameVert
-  bottomSupports?: {         // pas krótkich wsporników (przestrzeń nr 2)
-    height: number;          // wysokość wspornika (mm)
-    xs: number[];            // x-lewe (mm) każdego wspornika
+  // wzmocnienia pionowe (np. brama przesuwna)
+  verticalBars?: number[];   // x-lewe w mm, szerokość = frameVert
+
+  // PRZESTRZEŃ 2
+  bottomSupports?: {         // krótkie wsporniki tuż pod dolną ramą
+    height: number;          // wysokość wspornika
+    xs: number[];            // x-lewe każdego wspornika
   };
-  bottomStrip?: {            // pełny profil na całą długość (tuż pod dolną ramą)
-    height: number;          // wysokość (mm)
+  bottomStrip?: {            // pełny profil na całą długość, POD wspornikami
+    height: number;
   };
-  omega?: {                  // najniższy profil (może wystawać poza ramę)
-    height: number;          // wysokość (mm)
-    overhangL: number;       // wysunięcie w lewo (mm)
-    overhangR: number;       // wysunięcie w prawo (mm)
+  omega?: {                  // najniższy profil – może wystawać lewo/prawo
+    height: number;
+    overhangL?: number;      // wysunięcie poza lewą krawędź modułu
+    overhangR?: number;      // wysunięcie poza prawą krawędź modułu
   };
 };
 
-// Kolumna etykiet
+// kolumna etykiet po prawej
 export const LABEL_COL_MM = 148;
 
 export default function LayoutBlock({
@@ -46,25 +48,19 @@ export default function LayoutBlock({
   const stroke = "#333";
   const fillFrame = "#94a3b8";
 
-  // Wymiary obszarów
+  // wymiary wewnętrzne (obszar paneli)
   const frameT = withFrame ? frameVert : 0;
   const innerX = frameT;
   const innerY = frameT;
   const innerW = Math.max(0, outerW - 2 * frameT);
   const innerH = Math.max(0, outerH - 2 * frameT);
 
-  // Przestrzeń 2 – wysokości
-  const hSupports =
-    bottomSupports && bottomSupports.height > 0 && bottomSupports.xs.length > 0
-      ? bottomSupports.height
-      : 0;
-  const hStrip = bottomStrip?.height ? Math.max(0, bottomStrip.height) : 0;
-  const hOmega = omega?.height ? Math.max(0, omega.height) : 0;
-
-  // Całkowita „dodatkowa” wysokość na dole:
-  // - wsporniki mogą sięgać niżej niż strip+omega (lub odwrotnie) – bierzemy maksimum
-  const extraBottom = Math.max(hSupports, hStrip + hOmega);
-  const totalH = outerH + extraBottom;
+  // PRZESTRZEŃ 2 — wysokości składowe
+  const supportsH = Math.max(0, bottomSupports?.height ?? 0);
+  const stripH    = Math.max(0, bottomStrip?.height ?? 0);
+  const omegaH    = Math.max(0, omega?.height ?? 0);
+  const extraBottom = supportsH + stripH + omegaH;        // SUMA (nowe wymaganie)
+  const totalH      = outerH + extraBottom;               // wysokość całkowita modułu
 
   function rect(
     x: number,
@@ -75,10 +71,7 @@ export default function LayoutBlock({
     fill = "#ddd",
     s = "#333"
   ) {
-    const W = w * scale;
-    const H = h * scale;
-    const X = x * scale;
-    const Y = y * scale;
+    const W = w * scale, H = h * scale, X = x * scale, Y = y * scale;
     return (
       <g>
         <rect
@@ -96,12 +89,7 @@ export default function LayoutBlock({
             y={Y + H / 2}
             dominantBaseline="middle"
             fontSize={12}
-            style={{
-              paintOrder: "stroke",
-              stroke: "#fff",
-              strokeWidth: 3,
-              fontVariantNumeric: "tabular-nums",
-            }}
+            style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
           >
             {label}
           </text>
@@ -110,10 +98,9 @@ export default function LayoutBlock({
     );
   }
 
-  // --- rama (4 strony) + obrys całości (wys. totalH) ---
+  // --- rama (4 strony) + obrys z kolumną etykiet ---
   const frame = (
     <g>
-      {/* zewnętrzny obrys modułu + kolumna etykiet */}
       <rect
         x={0}
         y={0}
@@ -128,7 +115,7 @@ export default function LayoutBlock({
           {/* góra / dół */}
           {rect(0, 0, outerW, frameT, undefined, fillFrame)}
           {rect(0, outerH - frameT, outerW, frameT, undefined, fillFrame)}
-          {/* lewo / prawo (tylko do wysokości korpusu, bez przestrzeni 2) */}
+          {/* lewo / prawo */}
           {rect(0, 0, frameT, outerH, undefined, fillFrame)}
           {rect(outerW - frameT, 0, frameT, outerH, undefined, fillFrame)}
         </>
@@ -138,7 +125,7 @@ export default function LayoutBlock({
 
   const elems: JSX.Element[] = [];
 
-  // --- przerwa TOP (tylko jeśli jest rama) ---
+  // --- TOP GAP (gdy jest rama) ---
   let cursorY = innerY;
   let gapIdx = 0;
 
@@ -146,7 +133,7 @@ export default function LayoutBlock({
     const gTop = gaps[0] ?? 0;
     if (gTop > 0) {
       elems.push(
-        <g key="gap-top">
+        <g>
           <rect
             x={innerX * scale}
             y={innerY * scale}
@@ -162,12 +149,7 @@ export default function LayoutBlock({
             y={(innerY + gTop / 2) * scale}
             dominantBaseline="middle"
             fontSize={12}
-            style={{
-              paintOrder: "stroke",
-              stroke: "#fff",
-              strokeWidth: 3,
-              fontVariantNumeric: "tabular-nums",
-            }}
+            style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
           >
             {`${gTop.toFixed(2)} mm`}
           </text>
@@ -178,7 +160,7 @@ export default function LayoutBlock({
     gapIdx = 1;
   }
 
-  // --- panele + przerwy środkowe ---
+  // --- PANELS + MIDDLE GAPS ---
   for (let i = 0; i < panels.length; i++) {
     const t = panels[i];
     elems.push(rect(innerX, cursorY, innerW, t, `${t} mm`));
@@ -187,7 +169,7 @@ export default function LayoutBlock({
       const g = gaps[gapIdx++] ?? 0;
       if (g > 0) {
         elems.push(
-          <g key={`gap-mid-${i}`}>
+          <g>
             <rect
               x={innerX * scale}
               y={cursorY * scale}
@@ -203,12 +185,7 @@ export default function LayoutBlock({
               y={(cursorY + g / 2) * scale}
               dominantBaseline="middle"
               fontSize={12}
-              style={{
-                paintOrder: "stroke",
-                stroke: "#fff",
-                strokeWidth: 3,
-                fontVariantNumeric: "tabular-nums",
-              }}
+              style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
             >
               {`${g.toFixed(2)} mm`}
             </text>
@@ -219,14 +196,13 @@ export default function LayoutBlock({
     }
   }
 
-  // --- przerwa BOTTOM (tylko jeśli jest rama) ---
+  // --- BOTTOM GAP (gdy jest rama) ---
   if (withFrame) {
     const gBottom = gaps[gaps.length - 1] ?? 0;
     if (gBottom > 0) {
-      const hasBottomZone = extraBottom > 0;
-      const liftPx = hasBottomZone ? 10 : 0; // unieś etykietę, żeby nie zasłaniały jej elementy w Przestrzeni 2
+      const labelLiftPx = extraBottom > 0 ? 12 : 0; // unieś napis, by nie kolidował z Przestrzenią 2
       elems.push(
-        <g key="gap-bottom">
+        <g>
           <rect
             x={innerX * scale}
             y={cursorY * scale}
@@ -239,15 +215,10 @@ export default function LayoutBlock({
           />
           <text
             x={(outerW + 10) * scale}
-            y={(cursorY + gBottom / 2) * scale - liftPx}
+            y={(cursorY + gBottom / 2) * scale - labelLiftPx}
             dominantBaseline="middle"
             fontSize={12}
-            style={{
-              paintOrder: "stroke",
-              stroke: "#fff",
-              strokeWidth: 3,
-              fontVariantNumeric: "tabular-nums",
-            }}
+            style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
           >
             {`${gBottom.toFixed(2)} mm`}
           </text>
@@ -256,13 +227,12 @@ export default function LayoutBlock({
     }
   }
 
-  // --- wzmocnienia pionowe (np. brama przesuwna) ---
+  // --- WZMOCNIENIA PIONOWE ---
   if (withFrame && verticalBars.length > 0) {
     for (const xLeft of verticalBars) {
       const clampedX = Math.max(frameT, Math.min(outerW - frameT - frameT, xLeft));
       elems.push(
         <rect
-          key={`vbar-${xLeft}`}
           x={clampedX * scale}
           y={innerY * scale}
           width={frameT * scale}
@@ -275,16 +245,19 @@ export default function LayoutBlock({
     }
   }
 
-  // --- PRZESTRZEŃ 2 ---
-  // 1) Pełny profil (strip) – pod dolną ramą, na całej długości
-  if (hStrip > 0) {
+  // === PRZESTRZEŃ 2 (od góry do dołu): wsporniki -> strip -> omega ===
+  // rysujemy NAJPIERW strip i omegę (niżej), POTEM wsporniki na wierzchu,
+  // żeby nic ich nie zasłaniało wizualnie.
+
+  // 1) STRIP (pełny profil) – pod wspornikami
+  if (stripH > 0) {
+    const yStrip = (outerH + supportsH) * scale;
     elems.push(
       <rect
-        key="bottom-strip"
         x={0}
-        y={outerH * scale}
+        y={yStrip}
         width={outerW * scale}
-        height={hStrip * scale}
+        height={stripH * scale}
         fill={fillFrame}
         stroke={stroke}
         vectorEffect="non-scaling-stroke"
@@ -292,72 +265,81 @@ export default function LayoutBlock({
     );
   }
 
-  // 2) Krótkie wsporniki – szerokość = frameVert, y = outerH
-  if (hSupports > 0 && bottomSupports) {
-    const W = frameVert * scale;
-    const y = outerH * scale;
-    for (const xLeftRaw of bottomSupports.xs) {
-      const xLeft = Math.max(0, Math.min(outerW - frameVert, xLeftRaw));
+  // 2) OMEGA – najniżej; może wystawać lewo/prawo
+  if (omegaH > 0) {
+    const overL = Math.max(0, omega?.overhangL ?? 0);
+    const overR = Math.max(0, omega?.overhangR ?? 0);
+    const xOmega = -overL;
+    const wOmega = outerW + overL + overR;
+    const yOmega = (outerH + supportsH + stripH) * scale;
+
+    elems.push(
+      <rect
+        x={xOmega * scale}
+        y={yOmega}
+        width={wOmega * scale}
+        height={omegaH * scale}
+        fill={fillFrame}
+        stroke={stroke}
+        vectorEffect="non-scaling-stroke"
+      />
+    );
+  }
+
+  // 3) WSPORNIKI – tuż pod dolną ramą, rysowane NA KOŃCU (na wierzchu)
+  if (supportsH > 0 && bottomSupports && bottomSupports.xs.length > 0) {
+    const ySup = outerH * scale;
+    const H = supportsH * scale;
+    const W = frameT * scale; // szerokość = grubość ramy
+
+    for (const xLeft of bottomSupports.xs) {
+      // nie wyjdź poza moduł
+      const clampedX = Math.max(0, Math.min(outerW - frameVert, xLeft));
+      const X = clampedX * scale;
       elems.push(
         <rect
-          key={`support-${xLeftRaw}`}
-          x={xLeft * scale}
-          y={y}
+          x={X}
+          y={ySup}
           width={W}
-          height={hSupports * scale}
+          height={H}
           fill={fillFrame}
           stroke={stroke}
           vectorEffect="non-scaling-stroke"
         />
       );
     }
-  }
 
-  // 3) Omega – najniższy profil, może wystawać poza ramę
-  if (hOmega > 0 && omega) {
-    const overL = Math.max(0, omega.overhangL || 0);
-    const overR = Math.max(0, omega.overhangR || 0);
-    const x = -overL;
-    const w = outerW + overL + overR;
-    const y = (outerH + hStrip) * scale; // pod stripem (jeśli jest)
-    elems.push(
-      <rect
-        key="omega"
-        x={x * scale}
-        y={y}
-        width={w * scale}
-        height={hOmega * scale}
-        fill={fillFrame}
-        stroke={stroke}
-        vectorEffect="non-scaling-stroke"
-      />
-    );
-  }
-
-  // Etykieta wysokości A (łączna wysokość przestrzeni 2)
-  if (extraBottom > 0) {
+    // etykieta Przestrzeni 2 (łączna wysokość A)
     elems.push(
       <text
-        key="label-A"
         x={(outerW + 10) * scale}
-        y={(outerH + extraBottom / 2) * scale}
-        dominantBaseline="middle"
+        y={(outerH + extraBottom - 4) * scale}
         fontSize={12}
-        style={{
-          paintOrder: "stroke",
-          stroke: "#fff",
-          strokeWidth: 3,
-          fontVariantNumeric: "tabular-nums",
-        }}
+        dominantBaseline="ideographic"
+        style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
+      >
+        {`A: ${extraBottom.toFixed(2)} mm`}
+      </text>
+    );
+  } else if (extraBottom > 0) {
+    // brak wsporników, ale jest strip/omega – też pokaż łączną A
+    elems.push(
+      <text
+        x={(outerW + 10) * scale}
+        y={(outerH + extraBottom - 4) * scale}
+        fontSize={12}
+        dominantBaseline="ideographic"
+        style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
       >
         {`A: ${extraBottom.toFixed(2)} mm`}
       </text>
     );
   }
 
-  // --- wymiary całkowite (poziome i pionowe) ---
+  // --- WYMIARY CAŁKOWITE (z Przestrzenią 2) ---
   const dims = (
     <g>
+      {/* szerokość */}
       <line
         x1={0}
         y1={(totalH + 28) * scale}
@@ -373,16 +355,10 @@ export default function LayoutBlock({
         y={(totalH + 22) * scale}
         textAnchor="middle"
         fontSize={12}
-        style={{
-          paintOrder: "stroke",
-          stroke: "#fff",
-          strokeWidth: 3,
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {`${outerW} mm`}
-      </text>
+        style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
+      >{`${outerW} mm`}</text>
 
+      {/* wysokość */}
       <line
         x1={(outerW + LABEL_COL_MM + 28) * scale}
         y1={0}
@@ -398,16 +374,10 @@ export default function LayoutBlock({
         y={(totalH * scale) / 2}
         fontSize={12}
         transform={`rotate(90 ${(outerW + LABEL_COL_MM + 36) * scale} ${(totalH * scale) / 2})`}
-        style={{
-          paintOrder: "stroke",
-          stroke: "#fff",
-          strokeWidth: 3,
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {`${totalH} mm`}
-      </text>
+        style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
+      >{`${totalH} mm`}</text>
 
+      {/* tytuł */}
       <text
         x={0}
         y={-8}
@@ -422,8 +392,8 @@ export default function LayoutBlock({
 
   return (
     <g>
-      {elems}  {/* panele + przerwy + przestrzeń 2 */}
-      {frame}  {/* rama na wierzchu */}
+      {elems}  {/* panele + przerwy + piony + Przestrzeń 2 */}
+      {frame}  {/* rama na wierzchu (przykrywa krawędzie paneli) */}
       {dims}
     </g>
   );
