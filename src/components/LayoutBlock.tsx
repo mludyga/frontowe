@@ -1,4 +1,6 @@
 import type { JSX } from "react";
+import TailManual from './TailManual';
+import type { TailMode, TailManualLabels } from '../types/tail';
 
 /** Stała szerokości kolumny z etykietami */
 export const LABEL_COL_MM = 148;
@@ -47,6 +49,8 @@ export type LayoutProps = {
   tailAnnBaseMM?: number | null;
   tailAnnDiag1MM?: number | null;
   tailAnnDiag2MM?: number | null;
+  tailMode?: TailMode;                          // 'auto' | 'manual'
+  tailManualLabels?: TailManualLabels; 
 };
 
 export default function LayoutBlock({
