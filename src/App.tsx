@@ -1279,14 +1279,15 @@ const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
         tailEnabled,
         tailSide,
         tailVisBaseFrac,
+        tailMode,                 // 'auto' | 'manual'
+        tailManualLabels: tailLabels,
+        tailSkew2Frac,
+        tailBottomExtFrac,
         tailAnnBaseMM,
         tailAnnDiag1MM,
         tailAnnDiag2MM,
-        tailMode,                 // NEW
-        tailManualLabels: tailLabels, // NEW
       }
-    : {
-        tailEnabled: false,
+    : { tailEnabled: false } as const;
         tailSide: "right" as const,
         tailVisBaseFrac: 0.8,
         tailAnnBaseMM: null as number | null,
