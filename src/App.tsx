@@ -51,8 +51,8 @@ function computeProfileWidths(outerW: number, frameVert: number, verticalBars: n
 
 
 // Stałe layoutu
- MODULE_GUTTER_MM = 180;
- TOP_MARGIN_MM = 446;
+const MODULE_GUTTER_MM = 180;
+const TOP_MARGIN_MM = 446;
 
 export default function App() {
    [unit, setUnit] = useState<Unit>("mm");
