@@ -27,18 +27,19 @@ function distributeAutoGaps(leftover: number, autos: number, weights?: number[])
 }
 
 // Szerokości profili (światła między pionami)
-function computeProfileWidths(outerW: number, frameVert: number, verticalBars?: number[]) {
-   frameT = frameVert;
-   leftIn = frameT;
-   rightIn = outerW - frameT;
-   bars = (verticalBars ?? [])
+function computeProfileWidths(outerW: number, frameVert: number, verticalBars: number[] = []) {
+  const frameT = frameVert;
+  const leftIn = frameT;
+  const rightIn = outerW - frameT;
+
+  const bars = verticalBars
     .map((x) => Math.max(frameT, Math.min(outerW - frameT - frameT, x)))
     .sort((a, b) => a - b);
 
-   segs: Array<[number, number]> = [];
+  const segs: Array<[number, number]> = [];
   let start = leftIn;
-  for ( xLeft of bars) {
-     end = Math.min(xLeft, rightIn);
+  for (const xLeft of bars) {
+    const end = Math.min(xLeft, rightIn);
     if (end > start) segs.push([start, end]);
     start = Math.min(xLeft + frameT, rightIn);
   }
@@ -47,6 +48,7 @@ function computeProfileWidths(outerW: number, frameVert: number, verticalBars?: 
 
   return segs.map(([a, b]) => +(b - a).toFixed(2));
 }
+
 
 // Stałe layoutu
  MODULE_GUTTER_MM = 180;
