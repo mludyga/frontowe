@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import LayoutBlock, { LABEL_COL_MM } from "./components/LayoutBlock";
 import { toMM, fromMM, type Unit } from "./utils/units";
 import { round2, fmt2 } from "./utils/math";
-import type { TailSettings } from './types/tail';
+import type { TailMode, TailManualLabels } from './types/tail';
 
 // Typy pomocnicze
 type PanelGroup = { qty: number; t: number; inGate?: boolean };
