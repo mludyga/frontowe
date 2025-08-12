@@ -1,96 +1,158 @@
-import React from 'react';
-import type { TailManualLabels } from '../types/tail';
+import type { JSX } from "react";
+import type { TailManualLabels } from "../types/tail";
 
-type Props = {
-  side: 'left' | 'right';
-  outerW: number;      // mm
-  outerH: number;      // mm
-  frameVert: number;   // mm (grubość profilu = grubość ramy)
-  scale: number;       // px/mm
-  baseLen: number;     // mm (długość podstawy ogona w podglądzie)
+type TailManualProps = {
+  side: "left" | "right";
+  outerW: number;        // szerokość korpusu
+  outerH: number;        // wysokość korpusu
+  frameT: number;        // grubość ramy (mm)
+  omegaH: number;        // wysokość (grubość) omegi (mm)
+  omegaTopY: number;     // pozycja Y górnej krawędzi omegi (mm) = outerH + hA + hP
+  visBaseFrac: number;   // ułamek wysokości korpusu -> długość ogona L
+  skew2Frac: number;     // ułamek długości L, gdzie zaczyna się skos #2 (np. 0.6)
+  bottomExtFrac: number; // ułamek L dla przedłużenia dolnej ramy (np. 0.5)
   labels?: TailManualLabels;
+  scale: number;
+  stroke?: string;
+  fillFrame?: string;
 };
 
 export default function TailManual({
-  side, outerW, outerH, frameVert, scale, baseLen, labels = {},
-}: Props) {
-  const tPx = frameVert * scale;
-  const Hpx = outerH * scale;
+  side,
+  outerW,
+  outerH,
+  frameT,
+  omegaH,
+  omegaTopY,
+  visBaseFrac,
+  skew2Frac,
+  bottomExtFrac,
+  labels,
+  scale,
+  stroke = "#333",
+  fillFrame = "#94a3b8",
+}: TailManualProps): JSX.Element | null {
+  if (omegaH <= 0 || visBaseFrac <= 0) return null;
 
-  // punkt zaczepienia do korpusu bramy (dolny narożnik przy ramie)
-  const xAttach = (side === 'left' ? 0 : outerW) * scale;
-  const yBase = Hpx - tPx / 2;     // środek linii podstawy (przy dolnej ramie)
-  const dir = side === 'left' ? -1 : 1;
+  const mm = (v: number) => v * scale;
+  const dir = side === "right" ? 1 : -1;
 
-  const baseLenPx = baseLen * scale;
-  const xFar = xAttach + dir * baseLenPx;
+  // długość ogona L (poglądowa, z ułamka wysokości korpusu)
+  const L = Math.max(0, outerH * visBaseFrac);
 
-  // pomocnicze punkty (lekko „umowne”, zgodne ze szkicem)
-  const yTop = tPx / 2;                        // górny poziom (tu kończy się duża przekątna)
-  const ySupportTop = Hpx - tPx * 2.6;         // wyjście wspornika na pion
-  const xSupportStart = xAttach + dir * (baseLenPx * 0.35); // początek wspornika na podstawie
+  // --- 1) przedłużenie omegi (w linii omegi), grubość = omegaH ---
+  const extX = side === "right" ? outerW : outerW - L; // dla lewej rysujemy w lewo
+  const extW = L;
+  const extY = omegaTopY;
+  const extH = omegaH;
 
-  const textStyle: React.CSSProperties = {
-    paintOrder: 'stroke',
-    stroke: '#fff',
+  // --- 2) przedłużenie dolnej ramy (na dole korpusu) ---
+  const bottomLen = Math.max(0, L * Math.max(0, Math.min(1, bottomExtFrac)));
+  const bottomX = side === "right" ? outerW : outerW - bottomLen * (dir === -1 ? 1 : 0) - bottomLen * (dir === -1 ? 0 : 1);
+  // prościej:
+  const bX = side === "right" ? outerW : outerW - bottomLen;
+  const bY = outerH - frameT;
+
+  // --- 3) skosy (belki o grubości = frameT) ---
+  // skos #1: od końca omegi do górnego narożnika ramy
+  const s1x1 = side === "right" ? outerW + L : outerW - L;
+  const s1y1 = extY;                    // górna krawędź omegi
+  const s1x2 = side === "right" ? outerW : 0;
+  const s1y2 = 0;
+
+  // skos #2: od ~skew2Frac * L (liczone od ramy) do środka pionu
+  const frac = Math.max(0, Math.min(1, skew2Frac));
+  const s2x1 = side === "right" ? outerW + L * frac : outerW - L * frac;
+  const s2y1 = extY;
+  const s2x2 = side === "right" ? outerW - frameT / 2 : frameT / 2; // do pionu (środek profilu)
+  const s2y2 = outerH / 2;
+
+  // pomocnicze: rysowanie "belki" jako obróconego prostokąta o grubości frameT
+  function beam(x1: number, y1: number, x2: number, y2: number) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (len === 0) return null;
+    const ang = (Math.atan2(dy, dx) * 180) / Math.PI;
+    return (
+      <g transform={`translate(${mm(x1)} ${mm(y1)}) rotate(${ang})`}>
+        <rect
+          x={0}
+          y={mm(-frameT / 2)}
+          width={mm(len)}
+          height={mm(frameT)}
+          fill={fillFrame}
+          stroke={stroke}
+          vectorEffect="non-scaling-stroke"
+        />
+      </g>
+    );
+  }
+
+  // styl napisów (użytkownik wpisuje własne wartości)
+  const txt = {
+    paintOrder: "stroke",
+    stroke: "#fff",
     strokeWidth: 3,
-    fontVariantNumeric: 'tabular-nums',
-  };
+    fontVariantNumeric: "tabular-nums",
+  } as const;
+
+  // środki elementów do opisów
+  const mid = (a: number, b: number) => (a + b) / 2;
 
   return (
     <g>
-      {/* PODSTAWA */}
-      <line
-        x1={xAttach} y1={yBase}
-        x2={xFar}    y2={yBase}
-        stroke="#333" strokeWidth={tPx} strokeLinecap="square"
+      {/* przedłużenie omegi */}
+      <rect
+        x={mm(extX)}
+        y={mm(extY)}
+        width={mm(extW)}
+        height={mm(extH)}
+        fill={fillFrame}
+        stroke={stroke}
+        vectorEffect="non-scaling-stroke"
       />
+      {labels?.omega && (
+        <text x={mm(extX + extW / 2)} y={mm(extY) - 6} fontSize={11} textAnchor="middle" style={txt}>
+          {labels.omega}
+        </text>
+      )}
 
-      {/* PION na końcu ogona */}
-      <line
-        x1={xFar} y1={yTop}
-        x2={xFar} y2={Hpx - yTop}
-        stroke="#333" strokeWidth={tPx} strokeLinecap="square"
+      {/* przedłużenie dolnej ramy */}
+      <rect
+        x={mm(bX)}
+        y={mm(bY)}
+        width={mm(bottomLen)}
+        height={mm(frameT)}
+        fill={fillFrame}
+        stroke={stroke}
+        vectorEffect="non-scaling-stroke"
       />
-
-      {/* PRZEKĄTNA (duża) od narożnika bramy do wierzchołka pionu */}
-      <line
-        x1={xAttach} y1={yBase}
-        x2={xFar}    y2={yTop}
-        stroke="#333" strokeWidth={tPx} strokeLinecap="square"
-      />
-
-      {/* WSPORNIK (mniejsza przekątna) od podstawy do pionu, niżej */}
-      <line
-        x1={xSupportStart} y1={Hpx - tPx * 1.2}
-        x2={xFar}          y2={ySupportTop}
-        stroke="#333" strokeWidth={tPx} strokeLinecap="square"
-      />
-
-      {/* Etykiety — tylko jeśli są wpisane */}
-      {labels.base && (
-        <text x={(xAttach + xFar) / 2} y={yBase - 6} fontSize={11} textAnchor="middle" style={textStyle}>
+      {labels?.base && (
+        <text x={mm(bX + bottomLen / 2)} y={mm(bY) - 6} fontSize={11} textAnchor="middle" style={txt}>
           {labels.base}
         </text>
       )}
-      {labels.vertical && (
-        <text x={xFar + dir * (tPx * 0.8)} y={Hpx / 2} fontSize={11} textAnchor={side === 'left' ? 'end' : 'start'} style={textStyle}>
-          {labels.vertical}
-        </text>
-      )}
-      {labels.diagonal && (
-        <text x={xAttach + dir * (baseLenPx * 0.55)} y={(yBase + yTop) / 2 - 6} fontSize={11} textAnchor={side === 'left' ? 'end' : 'start'} style={textStyle}>
+
+      {/* skosy */}
+      {beam(s1x1, s1y1, s1x2, s1y2)}
+      {labels?.diagonal && (
+        <text x={mm(mid(s1x1, s1x2))} y={mm(mid(s1y1, s1y2)) - 6} fontSize={11} textAnchor="middle" style={txt}>
           {labels.diagonal}
         </text>
       )}
-      {labels.support && (
-        <text x={xSupportStart + dir * (baseLenPx * 0.25)} y={(Hpx - tPx * 1.2 + ySupportTop) / 2 - 6} fontSize={11} textAnchor={side === 'left' ? 'end' : 'start'} style={textStyle}>
-          {labels.support}
+
+      {beam(s2x1, s2y1, s2x2, s2y2)}
+      {labels?.vertical && (
+        <text x={mm(mid(s2x1, s2x2))} y={mm(mid(s2y1, s2y2)) - 6} fontSize={11} textAnchor="middle" style={txt}>
+          {labels.vertical}
         </text>
       )}
-      {labels.omega && (
-        <text x={xFar - dir * (tPx * 1.4)} y={Hpx - tPx * 0.4} fontSize={11} textAnchor={side === 'left' ? 'start' : 'end'} style={textStyle}>
-          {labels.omega}
+
+      {/* opcjonalny dodatkowy podpis */}
+      {labels?.support && (
+        <text x={mm(s1x2)} y={mm(s1y2) + 14} fontSize={11} textAnchor={side === "right" ? "end" : "start"} style={txt}>
+          {labels.support}
         </text>
       )}
     </g>
