@@ -848,6 +848,17 @@ export default function App() {
                   </div>
 
                   {tailEnabled && (
+  <label className="flex items-center gap-2 mt-2">
+    <input
+      type="checkbox"
+      checked={tailMode === 'manual'}
+      onChange={(e) => setTailMode(e.currentTarget.checked ? 'manual' : 'auto')}
+    />
+    <span>Ogon — tryb manualny (poglądowy)</span>
+  </label>
+)}
+
+                  {tailEnabled && (
                     <>
                       <label className="block mt-2">
                         Długość podstawy (proporcja wysokości korpusu)
