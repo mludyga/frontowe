@@ -1,25 +1,44 @@
 import type { JSX } from "react";
 
+export type TailSide = "left" | "right";
+export type TailConfig = {
+  enabled: boolean;
+  side: TailSide;
+
+  // Etykiety – czyste napisy, bez logiki (wpisujesz ręcznie)
+  labelBaseLen?: string;   // np. "1800 mm"
+  labelLowerExt?: string;  // np. "900 mm"
+  labelSupportH?: string;  // np. "80 mm"
+  labelDiagHigh?: string;  // np. "3/4 H"
+
+  // Proporcje wyglądu (schemat – brak powiązania z realnymi mm)
+  visBaseFrac?: number;       // długość ogona względem outerW (domyślnie 0.35)
+  visLowerExtFrac?: number;   // dolne przedłużenie względem base (domyślnie 0.5)
+  visDiagHighFrac?: number;   // gdzie „trafiamy” w pion ramy (0..1; domyślnie 0.75)
+};
+
 export type LayoutProps = {
   title: string;
   outerW: number;            // całkowita szerokość (z ramami lewo/prawo)
-  outerH: number;            // całkowita wysokość KORPUSU (do dolnej ramy)
+  outerH: number;            // całkowita wysokość korpusu (z ramami góra/dół)
   withFrame: boolean;        // jeśli true, rysujemy 4 strony ramy grubości frameVert
   gaps: number[];            // przerwy pionowe: [top, mid..., bottom] jeśli withFrame; w przeciwnym razie mid...
   panels: number[];          // wysokości paneli (pionowy stos)
   scale: number;
   frameVert: number;         // grubość ramy — ta sama dla góra/dół/lewo/prawo
 
-  // Pionowe wzmocnienia (np. w bramie przesuwnej) – pozycje X LEWE w mm
-  verticalBars?: number[];   // szerokość = frameVert
+  verticalBars?: number[];   // pozycje X (mm, od lewej krawędzi zewnętrznej); szerokość = frameVert
 
-  // Przestrzeń 2 (pod dolną ramą – wliczana do całkowitej wysokości)
-  bottomSupports?: { height: number; xs: number[] };                 // krótki „grzebień”
-  bottomProfile?:  { height: number };                               // profil pod wspornikami (na całą szerokość)
-  bottomOmega?:    { height: number; extendLeft?: number; extendRight?: number }; // najniższy profil, może wystawać
+  // Przestrzeń 2 — elementy pod dolną ramą (liczą się do całkowitej wysokości modułu)
+  bottomSupports?: { height: number; xs: number[] };
+  bottomProfile?: { height: number };
+  bottomOmega?: { height: number; extendLeft: number; extendRight: number };
 
-  // Pokazywanie wymiarów poziomych (szerokości profili między pionowymi przeszkodami)
+  // Kolumna z opisami szerokości profili (światła) – jeżeli chcesz je także w samym module
   showProfileWidths?: boolean;
+
+  // „Ogon” — schematyczny, rysowany poza modułem; nie wpływa na wymiary/sumy
+  tail?: TailConfig;
 };
 
 // Te same stałe co w widoku
@@ -38,44 +57,63 @@ export default function LayoutBlock({
   bottomSupports,
   bottomProfile,
   bottomOmega,
-  showProfileWidths = true,
+  showProfileWidths,
+  tail,
 }: LayoutProps) {
   const stroke = "#333";
   const fillFrame = "#94a3b8";
 
-  // --- geometria obszaru wewnętrznego (korpus, do dolnej ramy) ---
+  // Obszar wewnętrzny (między ramami lewo/prawo oraz góra/dół)
   const frameT = withFrame ? frameVert : 0;
   const innerX = frameT;
   const innerY = frameT;
   const innerW = Math.max(0, outerW - 2 * frameT);
   const innerH = Math.max(0, outerH - 2 * frameT);
 
-  // --- przestrzeń 2 (liczona do całkowitej wysokości) ---
-  const hSup   = bottomSupports?.height ?? 0;
-  const hProf  = bottomProfile?.height  ?? 0;
-  const hOmega = bottomOmega?.height    ?? 0;
-  const extL   = Math.max(0, bottomOmega?.extendLeft  ?? 0);
-  const extR   = Math.max(0, bottomOmega?.extendRight ?? 0);
-  const extraBottom = hSup + hProf + hOmega;
-  const totalH = outerH + extraBottom;
+  // „Przestrzeń 2” – wysokości składowe
+  const hA = bottomSupports?.height ?? 0;
+  const hB = bottomProfile?.height ?? 0;
+  const hO = bottomOmega?.height ?? 0;
 
-  // pomocnicze prostokąty (w skali)
+  // Całkowita wysokość modułu (korpus + przestrzeń 2)
+  const totalH = outerH + hA + hB + hO;
+
   function rect(
-    x: number, y: number, w: number, h: number,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
     label?: string,
-    fill = "#ddd", s = "#333"
+    fill = "#ddd",
+    s = "#333"
   ) {
-    const W = w * scale, H = h * scale, X = x * scale, Y = y * scale;
+    const W = w * scale,
+      H = h * scale,
+      X = x * scale,
+      Y = y * scale;
     return (
       <g>
-        <rect x={X} y={Y} width={W} height={H} fill={fill} stroke={s} vectorEffect="non-scaling-stroke" />
+        <rect
+          x={X}
+          y={Y}
+          width={W}
+          height={H}
+          fill={fill}
+          stroke={s}
+          vectorEffect="non-scaling-stroke"
+        />
         {label ? (
           <text
-            x={(outerW + 6) * scale}
+            x={(outerW + 6) * scale} // etykiety w kolumnie
             y={Y + H / 2}
             dominantBaseline="middle"
             fontSize={12}
-            style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
+            style={{
+              paintOrder: "stroke",
+              stroke: "#fff",
+              strokeWidth: 3,
+              fontVariantNumeric: "tabular-nums",
+            }}
           >
             {label}
           </text>
@@ -84,9 +122,10 @@ export default function LayoutBlock({
     );
   }
 
-  // --- rama (4 strony) + obrys modułu ---
+  // --- rama (4 strony) ---
   const frame = (
     <g>
+      {/* zewnętrzny obrys modułu + kolumna etykiet */}
       <rect
         x={0}
         y={0}
@@ -119,7 +158,7 @@ export default function LayoutBlock({
     const gTop = gaps[0] ?? 0;
     if (gTop > 0) {
       elems.push(
-        <g key="gap-top">
+        <g>
           <rect
             x={innerX * scale}
             y={innerY * scale}
@@ -135,7 +174,12 @@ export default function LayoutBlock({
             y={(innerY + gTop / 2) * scale}
             dominantBaseline="middle"
             fontSize={12}
-            style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
+            style={{
+              paintOrder: "stroke",
+              stroke: "#fff",
+              strokeWidth: 3,
+              fontVariantNumeric: "tabular-nums",
+            }}
           >
             {`${gTop.toFixed(2)} mm`}
           </text>
@@ -155,7 +199,7 @@ export default function LayoutBlock({
       const g = gaps[gapIdx++] ?? 0;
       if (g > 0) {
         elems.push(
-          <g key={`gap-mid-${i}`}>
+          <g>
             <rect
               x={innerX * scale}
               y={cursorY * scale}
@@ -171,7 +215,12 @@ export default function LayoutBlock({
               y={(cursorY + g / 2) * scale}
               dominantBaseline="middle"
               fontSize={12}
-              style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
+              style={{
+                paintOrder: "stroke",
+                stroke: "#fff",
+                strokeWidth: 3,
+                fontVariantNumeric: "tabular-nums",
+              }}
             >
               {`${g.toFixed(2)} mm`}
             </text>
@@ -186,9 +235,9 @@ export default function LayoutBlock({
   if (withFrame) {
     const gBottom = gaps[gaps.length - 1] ?? 0;
     if (gBottom > 0) {
-      const somethingBelow = hSup + hProf + hOmega > 0;
+      const hasBottomAnything = hA > 0 || hB > 0 || hO > 0;
       elems.push(
-        <g key="gap-bottom">
+        <g>
           <rect
             x={innerX * scale}
             y={cursorY * scale}
@@ -201,10 +250,15 @@ export default function LayoutBlock({
           />
           <text
             x={(outerW + 10) * scale}
-            y={(cursorY + gBottom / 2) * scale - (somethingBelow ? 8 : 0)}
+            y={(cursorY + gBottom / 2) * scale - (hasBottomAnything ? 8 : 0)}
             dominantBaseline="middle"
             fontSize={12}
-            style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
+            style={{
+              paintOrder: "stroke",
+              stroke: "#fff",
+              strokeWidth: 3,
+              fontVariantNumeric: "tabular-nums",
+            }}
           >
             {`${gBottom.toFixed(2)} mm`}
           </text>
@@ -213,16 +267,14 @@ export default function LayoutBlock({
     }
   }
 
-  // --- wzmocnienia pionowe ---
+  // --- wzmocnienia pionowe (np. brama przesuwna) ---
   if (withFrame && verticalBars.length > 0) {
-    const bars = [...verticalBars].sort((a, b) => a - b);
-    for (const xLeftRaw of bars) {
+    for (const xLeft of verticalBars) {
       // przycinamy w obszarze między górną a dolną ramą
-      const xLeft = Math.max(frameT, Math.min(outerW - frameT - frameT, xLeftRaw));
+      const clampedX = Math.max(frameT, Math.min(outerW - frameT - frameT, xLeft));
       elems.push(
         <rect
-          key={`vbar-${xLeft}`}
-          x={xLeft * scale}
+          x={clampedX * scale}
           y={innerY * scale}
           width={frameT * scale}
           height={innerH * scale}
@@ -234,21 +286,18 @@ export default function LayoutBlock({
     }
   }
 
-  // === PRZESTRZEŃ 2 (pod dolną ramą) – kolejność: wsporniki → profil → omega ===
-
-  // 1) krótkie wsporniki
-  if (withFrame && bottomSupports && bottomSupports.height > 0 && bottomSupports.xs.length > 0) {
-    const y = outerH * scale;
-    const H = bottomSupports.height * scale;
-    const W = frameT * scale; // szerokość = grubość ramy
+  // --- PRZESTRZEŃ 2: WSPORNIKI (A) ---
+  if (withFrame && bottomSupports && hA > 0 && bottomSupports.xs.length > 0) {
+    const y = outerH * scale; // tuż pod dolną ramą
+    const H = hA * scale;
+    const W = frameT * scale; // grubość = grubość ramy
 
     for (const xLeft of bottomSupports.xs) {
-      // pilnujemy, żeby wspornik nie wyszedł poza korpus
       const clampedX = Math.max(0, Math.min(outerW - frameVert, xLeft));
+      const X = clampedX * scale;
       elems.push(
         <rect
-          key={`bs-${clampedX}`}
-          x={clampedX * scale}
+          x={X}
           y={y}
           width={W}
           height={H}
@@ -259,30 +308,33 @@ export default function LayoutBlock({
       );
     }
 
-    // etykieta A (wysokość wspornika)
+    // Etykieta A pod modułem (po prawej)
     elems.push(
       <text
-        key="label-A"
         x={(outerW + 10) * scale}
-        y={(outerH + hSup / 2) * scale}
-        dominantBaseline="middle"
+        y={(outerH + 12) * scale}
         fontSize={12}
-        style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
+        style={{
+          paintOrder: "stroke",
+          stroke: "#fff",
+          strokeWidth: 3,
+          fontVariantNumeric: "tabular-nums",
+        }}
       >
-        {`A: ${bottomSupports.height.toFixed(2)} mm`}
+        {`A: ${hA.toFixed(2)} mm`}
       </text>
     );
   }
 
-  // 2) pełny profil na całej szerokości (pod wspornikami)
-  if (hProf > 0) {
+  // --- PRZESTRZEŃ 2: PROFIL PEŁNY (B) ---
+  if (withFrame && bottomProfile && hB > 0) {
+    const y = (outerH + hA) * scale;
     elems.push(
       <rect
-        key="profile"
         x={0}
-        y={(outerH + hSup) * scale}
+        y={y}
         width={outerW * scale}
-        height={hProf * scale}
+        height={hB * scale}
         fill={fillFrame}
         stroke={stroke}
         vectorEffect="non-scaling-stroke"
@@ -290,122 +342,200 @@ export default function LayoutBlock({
     );
   }
 
-  // 3) omega (najniższa) – może wystawać lewo/prawo
-  if (hOmega > 0) {
-    const x = -extL;
-    const w = outerW + extL + extR;
+  // --- PRZESTRZEŃ 2: OMEGA (O) z wysięgiem w lewo/prawo ---
+  if (withFrame && bottomOmega && hO > 0) {
+    const y = (outerH + hA + hB) * scale;
+    const extL = bottomOmega.extendLeft ?? 0;
+    const extR = bottomOmega.extendRight ?? 0;
+
     elems.push(
       <rect
-        key="omega"
-        x={x * scale}
-        y={(outerH + hSup + hProf) * scale}
-        width={w * scale}
-        height={hOmega * scale}
+        x={(-extL) * scale}
+        y={y}
+        width={(outerW + extL + extR) * scale}
+        height={hO * scale}
         fill={fillFrame}
         stroke={stroke}
         vectorEffect="non-scaling-stroke"
       />
     );
-    // podpisy wysięgów (jeśli są)
-    if (extL > 0 || extR > 0) {
-      const yTxt = (outerH + hSup + hProf + hOmega / 2) * scale;
-      if (extL > 0) {
-        elems.push(
-          <text
-            key="omega-extL"
-            x={(-extL / 2) * scale}
-            y={yTxt}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fontSize={12}
-            style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
-          >
-            {`${extL.toFixed(2)} mm`}
-          </text>
-        );
-      }
-      if (extR > 0) {
-        elems.push(
-          <text
-            key="omega-extR"
-            x={(outerW + extR / 2) * scale}
-            y={yTxt}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fontSize={12}
-            style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
-          >
-            {`${extR.toFixed(2)} mm`}
-          </text>
-        );
-      }
-    }
+
+    // Małe wypełnienie (cieniutka linia „prowadnicy”)
+    elems.push(
+      <line
+        x1={(-extL) * scale}
+        y1={(outerH + hA + hB + hO) * scale}
+        x2={(outerW + extR) * scale}
+        y2={(outerH + hA + hB + hO) * scale}
+        stroke="#999"
+        strokeDasharray="4 3"
+        vectorEffect="non-scaling-stroke"
+      />
+    );
+
+    // Etykieta „Ω”
+    elems.push(
+      <text
+        x={(outerW + 10) * scale}
+        y={(outerH + hA + hB + hO - 6) * scale}
+        fontSize={12}
+        style={{
+          paintOrder: "stroke",
+          stroke: "#fff",
+          strokeWidth: 3,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {`Ω: ${hO.toFixed(2)} mm`}
+      </text>
+    );
   }
 
-  // === WYMIARY POZIOME PROFILI (szerokości do docięcia) ===
-  if (showProfileWidths && withFrame) {
-    const leftIn  = frameT;
-    const rightIn = outerW - frameT;
+  // --- OGON (schemat; nie wpływa na wymiary) ---
+  if (tail?.enabled && withFrame) {
+    const side: TailSide = tail.side ?? "right";
+    const baseFrac = tail.visBaseFrac ?? 0.35;
+    const lowerFrac = tail.visLowerExtFrac ?? 0.5;
+    const highFrac = Math.max(0, Math.min(1, tail.visDiagHighFrac ?? 0.75));
 
-    // posortowane lewokrawędziowe X pionowych przeszkód (wzmocnienia)
-    const bars = [...verticalBars]
-      .map((x) => Math.max(frameT, Math.min(outerW - frameT - frameT, x)))
-      .sort((a, b) => a - b);
+    const extL = bottomOmega?.extendLeft ?? 0;
+    const extR = bottomOmega?.extendRight ?? 0;
 
-    type Seg = { a: number; b: number };
-    const segs: Seg[] = [];
-    let start = leftIn;
+    // bazowa długość „zgodnie z proporcją”
+    let baseLen = Math.max(0, baseFrac * outerW);
+    // opcjonalne „ograniczenie” do wysięgu omegi po danej stronie (żeby nie zachodzić na furtkę itd.)
+    const allowed = side === "right" ? extR : extL;
+    if (allowed > 0) baseLen = Math.min(baseLen, allowed);
 
-    for (const xLeft of bars) {
-      const end = Math.min(xLeft, rightIn);
-      if (end > start) segs.push({ a: start, b: end });
-      start = Math.min(xLeft + frameT, rightIn); // przeskok ZA wzmocnienie
-    }
-    if (rightIn > start) segs.push({ a: start, b: rightIn });
+    const baseH = frameT; // grubość ogona zgodna z ramą
+    const yOmegaTop = outerH + hA + hB;
+    const yBase = yOmegaTop + hO - baseH; // tak, by dół ogona „stykał się” z dołem omegi
 
-    // Jeżeli brak wzmocnień – jeden segment na całą „światło”
-    if (segs.length === 0) {
-      segs.push({ a: leftIn, b: rightIn });
-    }
+    const startX = side === "right" ? (outerW + extR) : (-extL);
+    const endX = side === "right" ? startX + baseLen : startX - baseLen;
 
-    const yDim = (outerH - frameT - 8) * scale; // tuż nad dolną ramą, wewnątrz
+    // belka bazowa
+    elems.push(
+      <rect
+        x={Math.min(startX, endX) * scale}
+        y={yBase * scale}
+        width={Math.abs(endX - startX) * scale}
+        height={baseH * scale}
+        fill={fillFrame}
+        stroke={stroke}
+        vectorEffect="non-scaling-stroke"
+      />
+    );
 
-    segs.forEach((s, i) => {
-      const x1 = s.a * scale;
-      const x2 = s.b * scale;
-      const mid = (s.a + s.b) / 2;
-      const len = (s.b - s.a).toFixed(2);
+    // skos nr 1: z końca belki do górnej krawędzi ramy
+    const targetTopX = side === "right" ? (outerW - frameT) : frameT;
+    const targetTopY = 0; // górna krawędź modułu (zewnętrzna)
+    elems.push(
+      <line
+        x1={endX * scale}
+        y1={yBase * scale}
+        x2={targetTopX * scale}
+        y2={targetTopY * scale}
+        stroke={stroke}
+        strokeWidth={1}
+        vectorEffect="non-scaling-stroke"
+      />
+    );
 
+    // dolne przedłużenie ramy
+    const lowerLen = lowerFrac * baseLen;
+    const lowerStartX = side === "right" ? (outerW - frameT) : (frameT - lowerLen);
+    elems.push(
+      <rect
+        x={lowerStartX * scale}
+        y={(outerH - frameT) * scale}
+        width={lowerLen * scale}
+        height={frameT * scale}
+        fill={fillFrame}
+        stroke={stroke}
+        vectorEffect="non-scaling-stroke"
+      />
+    );
+
+    // mały wspornik (wysokość = jak A; jeśli brak A – przyjmij min 20)
+    const smallH = hA > 0 ? hA : Math.max(20, frameT);
+    const supportX = side === "right"
+      ? (lowerStartX + lowerLen - frameT)
+      : lowerStartX;
+    elems.push(
+      <rect
+        x={supportX * scale}
+        y={outerH * scale}
+        width={frameT * scale}
+        height={smallH * scale}
+        fill={fillFrame}
+        stroke={stroke}
+        vectorEffect="non-scaling-stroke"
+      />
+    );
+
+    // skos nr 2: z czubka wspornika do ~3/4 wysokości ramy (po tej stronie)
+    const targetDiagX = side === "right" ? (outerW - frameT) : frameT;
+    const targetDiagY = (innerY + innerH * (1 - highFrac));
+    const startDiagX = side === "right" ? (supportX) : (supportX + frameT);
+    const startDiagY = outerH; // start nad „przestrzenią 2”
+    elems.push(
+      <line
+        x1={startDiagX * scale}
+        y1={startDiagY * scale}
+        x2={targetDiagX * scale}
+        y2={targetDiagY * scale}
+        stroke={stroke}
+        strokeWidth={1}
+        vectorEffect="non-scaling-stroke"
+      />
+    );
+
+    // --- etykiety (jeśli podane) ---
+    const labelStyle: JSX.CSSProperties = {
+      paintOrder: "stroke",
+      stroke: "#fff",
+      strokeWidth: 3,
+      fontVariantNumeric: "tabular-nums",
+    };
+
+    if (tail.labelBaseLen) {
+      const cx = (startX + endX) / 2;
       elems.push(
-        <g key={`profw-${i}`}>
-          <line
-            x1={x1}
-            x2={x2}
-            y1={yDim}
-            y2={yDim}
-            stroke="#333"
-            markerStart="url(#arrowhead)"
-            markerEnd="url(#arrowhead)"
-            vectorEffect="non-scaling-stroke"
-          />
-          <text
-            x={mid * scale}
-            y={yDim - 4}
-            textAnchor="middle"
-            fontSize={11}
-            style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
-          >
-            {`${len} mm`}
-          </text>
-        </g>
+        <text x={cx * scale} y={(yBase - 6) * scale} textAnchor="middle" fontSize={11} style={labelStyle}>
+          {tail.labelBaseLen}
+        </text>
       );
-    });
+    }
+    if (tail.labelLowerExt) {
+      const cx = (lowerStartX + (side === "right" ? lowerLen / 2 : lowerLen / 2)) * scale;
+      elems.push(
+        <text x={cx} y={(outerH - frameT - 6) * scale} textAnchor="middle" fontSize={11} style={labelStyle}>
+          {tail.labelLowerExt}
+        </text>
+      );
+    }
+    if (tail.labelSupportH) {
+      elems.push(
+        <text x={(supportX + frameT + 6) * scale} y={(outerH + smallH / 2) * scale} fontSize={11} style={labelStyle}>
+          {tail.labelSupportH}
+        </text>
+      );
+    }
+    if (tail.labelDiagHigh) {
+      const lx = (targetDiagX + startDiagX) / 2;
+      const ly = (targetDiagY + startDiagY) / 2;
+      elems.push(
+        <text x={lx * scale} y={(ly - 8) * scale} textAnchor="middle" fontSize={11} style={labelStyle}>
+          {tail.labelDiagHigh}
+        </text>
+      );
+    }
   }
 
-  // --- wymiary całkowite (łącznie z przestrzenią 2) ---
+  // --- wymiary całkowite (łącznie z „przestrzenią 2”) ---
   const dims = (
     <g>
-      {/* szerokość całkowita (korpus) */}
       <line
         x1={0}
         y1={(totalH + 28) * scale}
@@ -421,12 +551,14 @@ export default function LayoutBlock({
         y={(totalH + 22) * scale}
         textAnchor="middle"
         fontSize={12}
-        style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
-      >
-        {`${outerW} mm`}
-      </text>
+        style={{
+          paintOrder: "stroke",
+          stroke: "#fff",
+          strokeWidth: 3,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >{`${outerW} mm`}</text>
 
-      {/* wysokość całkowita = korpus + przestrzeń 2 */}
       <line
         x1={(outerW + LABEL_COL_MM + 28) * scale}
         y1={0}
@@ -442,10 +574,13 @@ export default function LayoutBlock({
         y={(totalH * scale) / 2}
         fontSize={12}
         transform={`rotate(90 ${(outerW + LABEL_COL_MM + 36) * scale} ${(totalH * scale) / 2})`}
-        style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" }}
-      >
-        {`${totalH} mm`}
-      </text>
+        style={{
+          paintOrder: "stroke",
+          stroke: "#fff",
+          strokeWidth: 3,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >{`${totalH} mm`}</text>
 
       <text
         x={0}
@@ -461,9 +596,9 @@ export default function LayoutBlock({
 
   return (
     <g>
-      {elems}   {/* panele + przerwy + piony + przestrzeń 2 + poziome wymiary profili */}
-      {frame}   {/* rama na wierzchu */}
-      {dims}    {/* wymiary całkowite */}
+      {elems} {/* panele + przerwy + wsporniki/profil/omega + ogon */}
+      {frame} {/* rama na wierzchu (żeby zasłonić brzegi paneli) */}
+      {dims}
     </g>
   );
 }
