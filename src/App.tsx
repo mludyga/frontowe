@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import LayoutBlock, { LABEL_COL_MM } from "./components/LayoutBlock";
 import { toMM, fromMM, type Unit } from "./utils/units";
 import { round2, fmt2 } from "./utils/math";
+import type { TailSettings } from './types/tail';
 
 // Typy pomocnicze
 type PanelGroup = { qty: number; t: number; inGate?: boolean };
@@ -95,6 +96,19 @@ export default function App() {
   const [tailAnnBaseMM, setTailAnnBaseMM] = useState<number | null>(null);
   const [tailAnnDiag1MM, setTailAnnDiag1MM] = useState<number | null>(null);
   const [tailAnnDiag2MM, setTailAnnDiag2MM] = useState<number | null>(null);
+  const defaultTail: TailSettings = {
+  enabled: true,
+  side: 'right',
+  viewLengthRatio: 1.3,   // ~45° przybliżenie
+  mode: 'auto',           // domyślnie jak było; przełączysz w UI
+  labels: {
+    vertical: '',
+    diagonal: '',
+    base: '',
+    omega: '',
+    support: ''
+  }
+};
 
   // FURTKA
   const [wicketWidth, setWicketWidth] = useState<number>(1000);
