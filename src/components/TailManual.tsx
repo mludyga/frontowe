@@ -48,7 +48,6 @@ export default function TailManual({
 
   // --- 2) przedłużenie dolnej ramy (na dole korpusu) ---
   const bottomLen = Math.max(0, L * Math.max(0, Math.min(1, bottomExtFrac)));
-  const bottomX = side === "right" ? outerW : outerW - bottomLen * (dir === -1 ? 1 : 0) - bottomLen * (dir === -1 ? 0 : 1);
   // prościej:
   const bX = side === "right" ? outerW : outerW - bottomLen;
   const bY = outerH - frameT;
