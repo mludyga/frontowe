@@ -35,7 +35,6 @@ export default function TailManual({
   if (omegaH <= 0 || visBaseFrac <= 0) return null;
 
   const mm = (v: number) => v * scale;
-  const dir = side === "right" ? 1 : -1;
 
   // długość ogona L (poglądowa, z ułamka wysokości korpusu)
   const L = Math.max(0, outerH * visBaseFrac);
