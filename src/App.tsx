@@ -94,8 +94,6 @@ const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
   const [tailAnnDiag1MM, setTailAnnDiag1MM] = useState<number | null>(null);
   const [tailAnnDiag2MM, setTailAnnDiag2MM] = useState<number | null>(null);
   const [tailMode, setTailMode] = useState<TailMode>('auto'); // przełącznik manual/auto
-  const [tailSkew2Frac, setTailSkew2Frac] = useState<number>(0.6);
-  const [tailBottomExtFrac, setTailBottomExtFrac] = useState<number>(0.5);
   const [tailLabels, setTailLabels] = useState<TailManualLabels>({
   vertical: '',
   diagonal: '',
@@ -1274,28 +1272,28 @@ const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
             } as const;
 
             const tailProps =
-  gateType === "przesuwna"
-    ? {
-        tailEnabled,
-        tailSide,
-        tailVisBaseFrac,
-        tailMode,                 // 'auto' | 'manual'
-        tailManualLabels: tailLabels,
-        // jeśli już masz w stanie, możesz tu DOŁOŻYĆ adnotacje:
-        tailAnnBaseMM,
-        tailAnnDiag1MM,
-        tailAnnDiag2MM,
-      }
-    : {
-        tailEnabled: false as const,
-        tailSide: "right" as const,
-        tailVisBaseFrac: 0.8,
-        tailMode: "auto" as const,
-        tailManualLabels: {} as TailManualLabels,
-        tailAnnBaseMM: null as number | null,
-        tailAnnDiag1MM: null as number | null,
-        tailAnnDiag2MM: null as number | null,
-      };
+              gateType === "przesuwna"
+                ? {
+                    tailEnabled,
+                    tailSide,
+                    tailVisBaseFrac,
+                    tailMode,                 // 'auto' | 'manual'
+                    tailManualLabels: tailLabels,
+                    tailAnnBaseMM,
+                    tailAnnDiag1MM,
+                    tailAnnDiag2MM,
+                  }
+                : {
+                    tailEnabled: false as const,
+                    tailSide: "right" as const,
+                    tailVisBaseFrac: 0.8,
+                    tailMode: "auto" as const,
+                    tailManualLabels: {} as TailManualLabels,
+                    tailAnnBaseMM: null as number | null,
+                    tailAnnDiag1MM: null as number | null,
+                    tailAnnDiag2MM: null as number | null,
+                  };
+
 
             const gateBlock = gate ? (
               gateType === "skrzydłowa" ? (
@@ -1311,6 +1309,7 @@ const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
                     frameVert={frameVert}
                     showProfileWidths
                     {...bottomGate}
+                    {...tailProps}
                   />
                   <g transform={`translate(${(gateWidth / 2 + 10) * scale}, 0)`}>
                     <LayoutBlock
@@ -1324,6 +1323,7 @@ const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
                       frameVert={frameVert}
                       showProfileWidths
                       {...bottomGate}
+                      {...tailProps}
                     />
                   </g>
                 </g>
