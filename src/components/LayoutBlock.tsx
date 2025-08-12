@@ -41,11 +41,12 @@ export default function LayoutBlock({
   bottomSupports,
   bottomProfile,
   bottomOmega,
-  showProfileWidths,
+  showProfileWidths = false,   // <— to zostaw
   tailEnabled = false,
   tailSide = "right",
   tailVisBaseFrac = 1,
   tailAnn,
+  
 }: LayoutProps) {
   const stroke = "#333";
   const fillFrame = "#94a3b8";
