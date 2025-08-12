@@ -827,96 +827,99 @@ export default function App() {
                 )}
               </div>
 
-              {/* OGON – tylko dla przesuwnej */}
-              {gateType === "przesuwna" && (
-                <div className="mt-3">
-                  <div className="font-medium">Ogon (wizualny)</div>
-                  <div className="grid md:grid-cols-2 gap-2">
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={tailEnabled} onChange={(e) => setTailEnabled(e.currentTarget.checked)} />
-                      <span>Włącz ogon</span>
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <label className="flex items-center gap-1">
-                        <input type="radio" name="tailSide" checked={tailSide === "left"} onChange={() => setTailSide("left")} />
-                        lewy
-                      </label>
-                      <label className="flex items-center gap-1">
-                        <input type="radio" name="tailSide" checked={tailSide === "right"} onChange={() => setTailSide("right")} />
-                        prawy
-                      </label>
-                    </div>
-                  </div>
-
-                  {tailEnabled && (
-  <label className="flex items-center gap-2 mt-2">
-    <input
-      type="checkbox"
-      checked={tailMode === 'manual'}
-      onChange={(e) => setTailMode(e.currentTarget.checked ? 'manual' : 'auto')}
-    />
-    <span>Ogon — tryb manualny (poglądowy)</span>
-  </label>
-)}
-
-                  {tailEnabled && (
-                    <>
-                      <label className="block mt-2">
-                        Długość podstawy (proporcja wysokości korpusu)
-                        <input
-                          type="range"
-                          min={0.2}
-                          max={1}
-                          step={0.05}
-                          value={tailVisBaseFrac}
-                          onChange={(e) => setTailVisBaseFrac(e.currentTarget.valueAsNumber || 0.8)}
-                        />
-                      </label>
-                     {tailMode === 'manual' ? (
-  <div className="grid md:grid-cols-2 gap-2 mt-2">
-    <input className="input" placeholder="Pion – etykieta"
-           value={tailLabels.vertical ?? ''} onChange={(e) => updateTailLabel('vertical', e.currentTarget.value)} />
-    <input className="input" placeholder="Przekątna – etykieta"
-           value={tailLabels.diagonal ?? ''} onChange={(e) => updateTailLabel('diagonal', e.currentTarget.value)} />
-    <input className="input" placeholder="Podstawa – etykieta"
-           value={tailLabels.base ?? ''} onChange={(e) => updateTailLabel('base', e.currentTarget.value)} />
-    <input className="input" placeholder="Omega – etykieta"
-           value={tailLabels.omega ?? ''} onChange={(e) => updateTailLabel('omega', e.currentTarget.value)} />
-    <input className="input" placeholder="Wspornik – etykieta"
-           value={tailLabels.support ?? ''} onChange={(e) => updateTailLabel('support', e.currentTarget.value)} />
-    <div className="col-span-full text-xs text-gray-600">
-      W trybie manualnym wszystkie elementy ogona mają grubość = <b>grubość ramy</b>. Powyższe pola to czysty tekst na rysunku.
+{/* OGON – tylko dla przesuwnej */}
+{gateType === "przesuwna" && (
+  <div className="mt-3">
+    <div className="font-medium">Ogon (wizualny)</div>
+    <div className="grid md:grid-cols-2 gap-2">
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={tailEnabled} onChange={(e) => setTailEnabled(e.currentTarget.checked)} />
+        <span>Włącz ogon</span>
+      </label>
+      <div className="flex items-center gap-3">
+        <label className="flex items-center gap-1">
+          <input type="radio" name="tailSide" checked={tailSide === "left"} onChange={() => setTailSide("left")} />
+          lewy
+        </label>
+        <label className="flex items-center gap-1">
+          <input type="radio" name="tailSide" checked={tailSide === "right"} onChange={() => setTailSide("right")} />
+          prawy
+        </label>
+      </div>
     </div>
-  </div>
-) : (
-  <div className="grid md:grid-cols-3 gap-2 mt-2">
-    <label className="block">
-      Adnotacja – podstawa (mm)
-      <input
-        type="number"
-        className="input"
-        value={tailAnnBaseMM ?? ""}
-        onChange={(e) => setTailAnnBaseMM(Number.isFinite(e.currentTarget.valueAsNumber) ? e.currentTarget.valueAsNumber : null)}
-      />
-    </label>
-    <label className="block">
-      Adnotacja – skos 1 (mm)
-      <input
-        type="number"
-        className="input"
-        value={tailAnnDiag1MM ?? ""}
-        onChange={(e) => setTailAnnDiag1MM(Number.isFinite(e.currentTarget.valueAsNumber) ? e.currentTarget.valueAsNumber : null)}
-      />
-    </label>
-    <label className="block">
-      Adnotacja – skos 2 (mm)
-      <input
-        type="number"
-        className="input"
-        value={tailAnnDiag2MM ?? ""}
-        onChange={(e) => setTailAnnDiag2MM(Number.isFinite(e.currentTarget.valueAsNumber) ? e.currentTarget.valueAsNumber : null)}
-      />
-    </label>
+
+    {tailEnabled && (
+      <>
+        <label className="flex items-center gap-2 mt-2">
+          <input
+            type="checkbox"
+            checked={tailMode === 'manual'}
+            onChange={(e) => setTailMode(e.currentTarget.checked ? 'manual' : 'auto')}
+          />
+          <span>Ogon — tryb manualny (poglądowy)</span>
+        </label>
+
+        <label className="block mt-2">
+          Długość podstawy (proporcja wysokości korpusu)
+          <input
+            type="range"
+            min={0.2}
+            max={1}
+            step={0.05}
+            value={tailVisBaseFrac}
+            onChange={(e) => setTailVisBaseFrac(e.currentTarget.valueAsNumber || 0.8)}
+          />
+        </label>
+
+        {tailMode === 'manual' ? (
+          <div className="grid md:grid-cols-2 gap-2 mt-2">
+            <input className="input" placeholder="Pion – etykieta"
+                   value={tailLabels.vertical ?? ''} onChange={(e) => updateTailLabel('vertical', e.currentTarget.value)} />
+            <input className="input" placeholder="Przekątna – etykieta"
+                   value={tailLabels.diagonal ?? ''} onChange={(e) => updateTailLabel('diagonal', e.currentTarget.value)} />
+            <input className="input" placeholder="Podstawa – etykieta"
+                   value={tailLabels.base ?? ''} onChange={(e) => updateTailLabel('base', e.currentTarget.value)} />
+            <input className="input" placeholder="Omega – etykieta"
+                   value={tailLabels.omega ?? ''} onChange={(e) => updateTailLabel('omega', e.currentTarget.value)} />
+            <input className="input" placeholder="Wspornik – etykieta"
+                   value={tailLabels.support ?? ''} onChange={(e) => updateTailLabel('support', e.currentTarget.value)} />
+            <div className="col-span-full text-xs text-gray-600">
+              W trybie manualnym wszystkie elementy ogona mają grubość = <b>grubość ramy</b>. Powyższe pola to czysty tekst na rysunku.
+            </div>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-2 mt-2">
+            <label className="block">
+              Adnotacja – podstawa (mm)
+              <input
+                type="number"
+                className="input"
+                value={tailAnnBaseMM ?? ""}
+                onChange={(e) => setTailAnnBaseMM(Number.isFinite(e.currentTarget.valueAsNumber) ? e.currentTarget.valueAsNumber : null)}
+              />
+            </label>
+            <label className="block">
+              Adnotacja – skos 1 (mm)
+              <input
+                type="number"
+                className="input"
+                value={tailAnnDiag1MM ?? ""}
+                onChange={(e) => setTailAnnDiag1MM(Number.isFinite(e.currentTarget.valueAsNumber) ? e.currentTarget.valueAsNumber : null)}
+              />
+            </label>
+            <label className="block">
+              Adnotacja – skos 2 (mm)
+              <input
+                type="number"
+                className="input"
+                value={tailAnnDiag2MM ?? ""}
+                onChange={(e) => setTailAnnDiag2MM(Number.isFinite(e.currentTarget.valueAsNumber) ? e.currentTarget.valueAsNumber : null)}
+              />
+            </label>
+          </div>
+        )}
+      </>
+    )}
   </div>
 )}
 
