@@ -108,9 +108,9 @@ export default function App() {
   const [wicketOmegaH, setWicketOmegaH] = useState<number>(80);
 
   // dodatkowe panele – BRAMA / FURTKA
-  const [gateExtraPanels, setGateExtraPanels] = useState<number[]>([]);
-  const [gateGapAfterBase, setGateGapAfterBase] = useState<number>(0);
-  const [gateGapBetweenExtras, setGateGapBetweenExtras] = useState<number>(0);
+  const [gateExtraPanels] = useState<number[]>([]);
+  const [gateGapAfterBase] = useState<number>(0);
+  const [gateGapBetweenExtras] = useState<number>(0);
 
   const [wicketExtraPanels, setWicketExtraPanels] = useState<number[]>([]);
   const [wicketGapAfterBase, setWicketGapAfterBase] = useState<number>(0);
