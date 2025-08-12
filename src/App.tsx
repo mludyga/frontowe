@@ -55,31 +55,26 @@ const MODULE_GUTTER_MM = 180;
 const TOP_MARGIN_MM = 446;
 
 export default function App() {
-   [unit, setUnit] = useState<Unit>("mm");
+const [unit, setUnit] = useState<Unit>("mm");
 
-  // PRZĘSŁO
-   [spanWidth, setSpanWidth] = useState<number>(2000);
-   [spanHeight, setSpanHeight] = useState<number>(1200);
-   [hasFrame, setHasFrame] = useState<boolean>(false);
-   [frameVert, setFrameVert] = useState<number>(60);
+const [spanWidth, setSpanWidth] = useState<number>(2000);
+const [spanHeight, setSpanHeight] = useState<number>(1200);
+const [hasFrame, setHasFrame] = useState<boolean>(false);
+const [frameVert, setFrameVert] = useState<number>(60);
 
-  // Grupy paneli przęsła
-   [groups, setGroups] = useState<PanelGroup[]>([{ qty: 6, t: 100, inGate: true }]);
-   [gapMode, setGapMode] = useState<GapMode>("equal");
-   [weightedAuto, setWeightedAuto] = useState<boolean>(false);
-   [customGaps, setCustomGaps] = useState<CustomGap[]>([]);
+const [groups, setGroups] = useState<PanelGroup[]>([{ qty: 6, t: 100, inGate: true }]);
+const [gapMode, setGapMode] = useState<GapMode>("equal");
+const [weightedAuto, setWeightedAuto] = useState<boolean>(false);
+const [customGaps, setCustomGaps] = useState<CustomGap[]>([]);
 
-  // BRAMA + FURTKA
-   [gateType, setGateType] = useState<GateType>("none");
-   [gateWidth, setGateWidth] = useState<number>(4000);
-   [gateHeight, setGateHeight] = useState<number>(1400);
-   [gateEqualBays, setGateEqualBays] = useState<boolean>(true); // równe światła dla przesuwnej
+const [gateType, setGateType] = useState<GateType>("none");
+const [gateWidth, setGateWidth] = useState<number>(4000);
+const [gateHeight, setGateHeight] = useState<number>(1400);
+const [gateEqualBays, setGateEqualBays] = useState<boolean>(true);
 
-  // Pokazywanie furtki
-   [showWicket, setShowWicket] = useState<boolean>(true);
+const [showWicket, setShowWicket] = useState<boolean>(true);
 
-  // Przestrzeń 2 – BRAMA
-   [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
+const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
   const [gateBottomSupportH, setGateBottomSupportH] = useState<number>(80);
   const [gateBottomExtraPerSpan, setGateBottomExtraPerSpan] = useState<number>(0);
 
