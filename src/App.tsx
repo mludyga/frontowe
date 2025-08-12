@@ -28,17 +28,17 @@ function distributeAutoGaps(leftover: number, autos: number, weights?: number[])
 
 // Szerokości profili (światła między pionami)
 function computeProfileWidths(outerW: number, frameVert: number, verticalBars?: number[]) {
-  const frameT = frameVert;
-  const leftIn = frameT;
-  const rightIn = outerW - frameT;
-  const bars = (verticalBars ?? [])
+   frameT = frameVert;
+   leftIn = frameT;
+   rightIn = outerW - frameT;
+   bars = (verticalBars ?? [])
     .map((x) => Math.max(frameT, Math.min(outerW - frameT - frameT, x)))
     .sort((a, b) => a - b);
 
-  const segs: Array<[number, number]> = [];
+   segs: Array<[number, number]> = [];
   let start = leftIn;
-  for (const xLeft of bars) {
-    const end = Math.min(xLeft, rightIn);
+  for ( xLeft of bars) {
+     end = Math.min(xLeft, rightIn);
     if (end > start) segs.push([start, end]);
     start = Math.min(xLeft + frameT, rightIn);
   }
@@ -49,35 +49,35 @@ function computeProfileWidths(outerW: number, frameVert: number, verticalBars?: 
 }
 
 // Stałe layoutu
-const MODULE_GUTTER_MM = 180;
-const TOP_MARGIN_MM = 446;
+ MODULE_GUTTER_MM = 180;
+ TOP_MARGIN_MM = 446;
 
 export default function App() {
-  const [unit, setUnit] = useState<Unit>("mm");
+   [unit, setUnit] = useState<Unit>("mm");
 
   // PRZĘSŁO
-  const [spanWidth, setSpanWidth] = useState<number>(2000);
-  const [spanHeight, setSpanHeight] = useState<number>(1200);
-  const [hasFrame, setHasFrame] = useState<boolean>(false);
-  const [frameVert, setFrameVert] = useState<number>(60);
+   [spanWidth, setSpanWidth] = useState<number>(2000);
+   [spanHeight, setSpanHeight] = useState<number>(1200);
+   [hasFrame, setHasFrame] = useState<boolean>(false);
+   [frameVert, setFrameVert] = useState<number>(60);
 
   // Grupy paneli przęsła
-  const [groups, setGroups] = useState<PanelGroup[]>([{ qty: 6, t: 100, inGate: true }]);
-  const [gapMode, setGapMode] = useState<GapMode>("equal");
-  const [weightedAuto, setWeightedAuto] = useState<boolean>(false);
-  const [customGaps, setCustomGaps] = useState<CustomGap[]>([]);
+   [groups, setGroups] = useState<PanelGroup[]>([{ qty: 6, t: 100, inGate: true }]);
+   [gapMode, setGapMode] = useState<GapMode>("equal");
+   [weightedAuto, setWeightedAuto] = useState<boolean>(false);
+   [customGaps, setCustomGaps] = useState<CustomGap[]>([]);
 
   // BRAMA + FURTKA
-  const [gateType, setGateType] = useState<GateType>("none");
-  const [gateWidth, setGateWidth] = useState<number>(4000);
-  const [gateHeight, setGateHeight] = useState<number>(1400);
-  const [gateEqualBays, setGateEqualBays] = useState<boolean>(true); // równe światła dla przesuwnej
+   [gateType, setGateType] = useState<GateType>("none");
+   [gateWidth, setGateWidth] = useState<number>(4000);
+   [gateHeight, setGateHeight] = useState<number>(1400);
+   [gateEqualBays, setGateEqualBays] = useState<boolean>(true); // równe światła dla przesuwnej
 
   // Pokazywanie furtki
-  const [showWicket, setShowWicket] = useState<boolean>(true);
+   [showWicket, setShowWicket] = useState<boolean>(true);
 
   // Przestrzeń 2 – BRAMA
-  const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
+   [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
   const [gateBottomSupportH, setGateBottomSupportH] = useState<number>(80);
   const [gateBottomExtraPerSpan, setGateBottomExtraPerSpan] = useState<number>(0);
 
