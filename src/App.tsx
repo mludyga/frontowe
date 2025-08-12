@@ -96,18 +96,16 @@ export default function App() {
   const [tailAnnBaseMM, setTailAnnBaseMM] = useState<number | null>(null);
   const [tailAnnDiag1MM, setTailAnnDiag1MM] = useState<number | null>(null);
   const [tailAnnDiag2MM, setTailAnnDiag2MM] = useState<number | null>(null);
-  const defaultTail: TailSettings = {
-  enabled: true,
-  side: 'right',
-  viewLengthRatio: 1.3,   // ~45° przybliżenie
-  mode: 'auto',           // domyślnie jak było; przełączysz w UI
-  labels: {
-    vertical: '',
-    diagonal: '',
-    base: '',
-    omega: '',
-    support: ''
-  }
+  const [tailMode, setTailMode] = useState<TailMode>('auto'); // przełącznik manual/auto
+  const [tailLabels, setTailLabels] = useState<TailManualLabels>({
+  vertical: '',
+  diagonal: '',
+  base: '',
+  omega: '',
+  support: '',
+});
+  const updateTailLabel = (key: keyof TailManualLabels, val: string) =>
+  setTailLabels((s) => ({ ...s, [key]: val }));
 };
 
   // FURTKA
