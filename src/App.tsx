@@ -1281,20 +1281,20 @@ const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
         tailVisBaseFrac,
         tailMode,                 // 'auto' | 'manual'
         tailManualLabels: tailLabels,
-        tailSkew2Frac,
-        tailBottomExtFrac,
+        // jeśli już masz w stanie, możesz tu DOŁOŻYĆ adnotacje:
         tailAnnBaseMM,
         tailAnnDiag1MM,
         tailAnnDiag2MM,
       }
-    : { tailEnabled: false } as const;
+    : {
+        tailEnabled: false as const,
         tailSide: "right" as const,
         tailVisBaseFrac: 0.8,
+        tailMode: "auto" as const,
+        tailManualLabels: {} as TailManualLabels,
         tailAnnBaseMM: null as number | null,
         tailAnnDiag1MM: null as number | null,
         tailAnnDiag2MM: null as number | null,
-        tailMode: 'auto' as const,      // NEW
-        tailManualLabels: {} as const,  // NEW
       };
 
             const gateBlock = gate ? (
