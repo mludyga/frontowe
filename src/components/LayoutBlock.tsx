@@ -25,19 +25,19 @@ export type LayoutProps = {
     extendRight?: number;    // wysięg w prawo poza moduł (mm)
   };
 
-  // „Ogon” – element schematyczny dla bramy przesuwnej
+  // „Ogon” – element schematyczny dla bramy przesuwnej (tylko wizualny)
   tail?: {
     enabled: boolean;
     side: "left" | "right";
-    // Etykiety (dowolny tekst – wprowadzany ręcznie)
-    labelBaseLen?: string;    // opis długości bazowej (przedłużenie omegi)
-    labelLowerExt?: string;   // opis dolnego przedłużenia od dolnej ramy
+    // Etykiety (dowolny tekst)
+    labelBaseLen?: string;    // opis długości bazowej ogona
+    labelLowerExt?: string;   // opis dolnego przedłużenia
     labelSupportH?: string;   // opis wysokości wspornika ogona
     labelDiagHigh?: string;   // opis wysokości skosu
-    // Proporcje wizualne (0..1) – tylko wygląd, nie są liczone wymiarowo
-    visBaseFrac?: number;     // długość bazowa ogona w proporcji do outerW (default 0.35)
-    visLowerExtFrac?: number; // dolne przedłużenie w proporcji do wysięgu omegi na danej stronie (default 0.5)
-    visDiagHighFrac?: number; // wysokość skosu (ułamek wysokości modułu, default 0.75)
+    // Proporcje wizualne (0..1) – tylko wygląd
+    visBaseFrac?: number;     // długość bazowa vs outerW (default 0.35)
+    visLowerExtFrac?: number; // dolne przedłużenie vs wysięg omegi po danej stronie (default 0.5)
+    visDiagHighFrac?: number; // wysokość skosu vs outerH (default 0.75)
   };
 };
 
@@ -256,7 +256,6 @@ export default function LayoutBlock({
   // --- wzmocnienia pionowe (np. brama przesuwna) ---
   if (withFrame && verticalBars.length > 0) {
     for (const xLeft of verticalBars) {
-      // przycinamy w obszarze między górną a dolną ramą
       const clampedX = Math.max(frameT, Math.min(outerW - 2 * frameT, xLeft));
       elems.push(
         <rect
@@ -280,7 +279,7 @@ export default function LayoutBlock({
     const W = frameT * scale;       // szerokość = grubość ramy
 
     for (const xLeft of bottomSupports.xs) {
-      // pilnujemy, żeby wspornik nie wyszedł poza ramy
+      // wspornik może leżeć idealnie pod ramą L/P
       const clampedX = Math.max(0, Math.min(outerW - frameVert, xLeft));
       const X = clampedX * scale;
       elems.push(
@@ -325,7 +324,6 @@ export default function LayoutBlock({
         vectorEffect="non-scaling-stroke"
       />
     );
-    // etykieta B
     elems.push(
       <text
         x={(outerW + 10) * scale}
@@ -339,7 +337,7 @@ export default function LayoutBlock({
     );
   }
 
-  // --- PRZESTRZEŃ 2: Ω – omega najniżej (z wysięgami) ---
+  // --- PRZESTRZEŃ 2: Ω – omega (z wysięgami) ---
   if (bottomOmega && bottomOmega.height > 0) {
     const h = bottomOmega.height;
     const extL = Math.max(0, bottomOmega.extendLeft ?? 0);
@@ -360,7 +358,7 @@ export default function LayoutBlock({
       />
     );
 
-    // etykieta Ω przy korpusie (nie „na wysięgu”)
+    // etykieta Ω przy korpusie
     elems.push(
       <text
         x={(outerW + 10) * scale}
@@ -374,49 +372,43 @@ export default function LayoutBlock({
     );
   }
 
-  // --- OGON (schematyczny, nie wymiarujemy automatycznie) ---
+  // --- OGON (schematyczny – tylko wizualny) ---
   if (tail?.enabled && bottomOmega && bottomOmega.height > 0) {
     const side = tail.side ?? "right";
     const extL = Math.max(0, bottomOmega.extendLeft ?? 0);
     const extR = Math.max(0, bottomOmega.extendRight ?? 0);
 
-    // proporcje wizualne
-    const baseFrac = tail.visBaseFrac ?? 0.35;      // długość bazowa ogona vs outerW
-    const lowerFrac = tail.visLowerExtFrac ?? 0.5;  // dolne przedłużenie vs wysięg po danej stronie
-    const diagFrac = tail.visDiagHighFrac ?? 0.75;  // wysokość skosu vs outerH
+    const baseFrac = tail.visBaseFrac ?? 0.35;
+    const lowerFrac = tail.visLowerExtFrac ?? 0.5;
+    const diagFrac = tail.visDiagHighFrac ?? 0.75;
 
-    const baseLen = Math.max(30, outerW * baseFrac); // mm
-    const omegaYTop = outerH + extraA + extraB;      // górna krawędź omegi
-    const omegaYBot = omegaYTop + (bottomOmega.height ?? 0);
+    const baseLen = Math.max(30, outerW * baseFrac);  // mm
+    const omegaTop = outerH + extraA + extraB;
+    const omegaH = bottomOmega.height;
 
-    // punkt kotwiczenia przy module (na wysokości omegi)
-    const anchorX = side === "right" ? outerW : 0;
-    const dir = side === "right" ? 1 : -1;
-
-    // 1) Bazowa belka ogona (przedłużenie omegi)
+    // 1) Bazowe przedłużenie omegi
     const baseX = (side === "right" ? outerW : -baseLen) * scale;
     elems.push(
       <rect
         x={baseX}
-        y={omegaYTop * scale}
-        width={(baseLen * dir) * scale}
-        height={(bottomOmega.height ?? frameVert) * scale}
-        transform={dir === 1 ? undefined : `scale(-1,1) translate(${-2 * baseX},0)`}
+        y={omegaTop * scale}
+        width={baseLen * scale}
+        height={omegaH * scale}
         fill={fillFrame}
         stroke={stroke}
         vectorEffect="non-scaling-stroke"
       />
     );
 
-    // 2) Skos od końca omegi do ~3/4 wysokości ramy
-    const baseEndX = (anchorX + dir * baseLen) * scale;
-    const diagTopX = (side === "right" ? outerW - frameT : frameT) * scale;
+    // 2) Skos do ~3/4 wysokości ramy
+    const baseEndX = (side === "right" ? outerW + baseLen : -baseLen) * scale;
+    const diagTopX = (side === "right" ? (outerW - frameT) : frameT) * scale;
     const diagTopY = (innerY + innerH * (1 - diagFrac)) * scale;
 
     elems.push(
       <line
         x1={baseEndX}
-        y1={omegaYTop * scale}
+        y1={omegaTop * scale}
         x2={diagTopX}
         y2={diagTopY}
         stroke={stroke}
@@ -425,18 +417,17 @@ export default function LayoutBlock({
       />
     );
 
-    // 3) Dolne przedłużenie od dolnej ramy (ok. połowa wysięgu po danej stronie)
+    // 3) Dolne przedłużenie od dolnej ramy
     const sideExt = side === "right" ? extR : extL;
     const lowerLen = Math.max(0, sideExt * lowerFrac);
     if (lowerLen > 0) {
       const yLower = (outerH - frameT) * scale;
-      const xLower = (side === "right" ? outerW : outerW - outerW) * scale;
-      const lowerX0 = (side === "right" ? outerW : 0) * scale;
+      const lowerX = (side === "right" ? outerW : -lowerLen) * scale;
       elems.push(
         <rect
-          x={side === "right" ? lowerX0 : (lowerX0 - lowerLen * scale)}
+          x={lowerX}
           y={yLower}
-          width={(lowerLen) * scale}
+          width={lowerLen * scale}
           height={frameT * scale}
           fill={fillFrame}
           stroke={stroke}
@@ -444,15 +435,13 @@ export default function LayoutBlock({
         />
       );
 
-      // 4) pionowy „wspornik ogona” na końcu tego przedłużenia
-      const suppX = (side === "right"
-        ? (outerW + lowerLen - frameT)
-        : (0 - lowerLen)) * scale;
+      // 4) pionowy wspornik ogona
+      const suppX = (side === "right" ? (outerW + lowerLen - frameT) : (-lowerLen)) * scale;
       const suppH = bottomSupports?.height ?? frameT;
       elems.push(
         <rect
           x={suppX}
-          y={(outerH) * scale}
+          y={outerH * scale}
           width={frameT * scale}
           height={suppH * scale}
           fill={fillFrame}
@@ -461,7 +450,7 @@ export default function LayoutBlock({
         />
       );
 
-      // 5) wewnętrzny skos od szczytu tego wspornika do ~3/4 wysokości ramy
+      // 5) wewnętrzny skos do ~3/4 wysokości
       const innerDiagX1 = (side === "right" ? (outerW + lowerLen) : (-lowerLen)) * scale;
       const innerDiagY1 = (outerH) * scale;
       const innerDiagX2 = (side === "right" ? (outerW - frameT) : frameT) * scale;
@@ -479,10 +468,10 @@ export default function LayoutBlock({
       );
     }
 
-    // etykiety (tylko tekst; po Twojej stronie jakie wpiszesz)
+    // Etykiety (jeśli podane)
     const labelX = (outerW + 10) * scale;
     const labels: Array<[number, string | undefined]> = [
-      [omegaYTop + (bottomOmega.height ?? frameT) / 2, tail.labelBaseLen],
+      [omegaTop + omegaH / 2, tail.labelBaseLen],
       [outerH - frameT / 2, tail.labelLowerExt],
       [outerH + (bottomSupports?.height ?? frameT) / 2, tail.labelSupportH],
       [innerY + innerH * (1 - (tail.visDiagHighFrac ?? 0.75)), tail.labelDiagHigh],
@@ -544,7 +533,7 @@ export default function LayoutBlock({
         style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}
       >
         {title}
-      </text}
+      </text>
     </g>
   );
 
