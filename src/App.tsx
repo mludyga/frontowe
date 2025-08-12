@@ -108,7 +108,6 @@ export default function App() {
 });
   const updateTailLabel = (key: keyof TailManualLabels, val: string) =>
   setTailLabels((s) => ({ ...s, [key]: val }));
-};
 
   // FURTKA
   const [wicketWidth, setWicketWidth] = useState<number>(1000);
