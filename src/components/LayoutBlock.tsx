@@ -45,12 +45,14 @@ export type LayoutProps = {
   /** długość podstawy ogona jako ułamek wysokości korpusu (np. 0.8) */
   tailVisBaseFrac?: number;
 
-  /** Adnotacje (teksty w mm) – tylko wyświetlamy */
+  /** Adnotacje (teksty w mm) – tylko wyświetlamy (AUTO) */
   tailAnnBaseMM?: number | null;
   tailAnnDiag1MM?: number | null;
   tailAnnDiag2MM?: number | null;
+
+  /** Tryb ogona i etykiety do trybu manualnego */
   tailMode?: TailMode;                          // 'auto' | 'manual'
-  tailManualLabels?: TailManualLabels; 
+  tailManualLabels?: TailManualLabels;
 };
 
 export default function LayoutBlock({
@@ -73,6 +75,8 @@ export default function LayoutBlock({
   tailAnnBaseMM,
   tailAnnDiag1MM,
   tailAnnDiag2MM,
+  tailMode = 'auto',
+  tailManualLabels,
 }: LayoutProps) {
   const stroke = "#333";
   const fillFrame = "#94a3b8";
@@ -460,94 +464,103 @@ export default function LayoutBlock({
   }
 
   // --- OGON (wizualny) ---
-  if (tailEnabled && hO > 0) {
-    const extL = Math.max(0, bottomOmega?.extendLeft ?? 0);
-    const extR = Math.max(0, bottomOmega?.extendRight ?? 0);
-    const dir = tailSide === "right" ? 1 : -1;
+  let tailGroup: JSX.Element | null = null;
 
-    // podstawa ogona startuje na ZEWNĘTRZNEJ krawędzi omegi (z wysięgiem)
-    const baseStartX =
-      tailSide === "right" ? outerW + extR : 0 - extL;
-    const baseY = outerH + hA + hP + hO; // dół omegi
-    const baseLen = Math.max(outerH * tailVisBaseFrac, 0); // tylko wizual
+  if (tailEnabled) {
+    const baseLenVis = Math.max(outerH * tailVisBaseFrac, 0);
 
-    const baseEndX = baseStartX + dir * baseLen;
-
-    // wierzchołek na górnej krawędzi ramy po stronie ogona
-    const topX = tailSide === "right" ? outerW : 0;
-    const topY = 0;
-
-    // mały pionowy słupek ~ w połowie podstawy
-    const postX = baseStartX + dir * baseLen * 0.5 - frameT / 2;
-    const postH = Math.max(hA, 1); // taka sama wysokość jak wsporniki A (wizualnie)
-    elems.push(
-      <rect
-        x={mm(postX)}
-        y={mm(baseY - postH)}
-        width={mm(frameT)}
-        height={mm(postH)}
-        fill={fillFrame}
-        stroke={stroke}
-        vectorEffect="non-scaling-stroke"
-      />
-    );
-
-    // kontur ogona (trójkąt) + wewnętrzne przekątne
-    const tailStroke = { fill: "none", stroke, vectorEffect: "non-scaling-stroke" } as any;
-
-    // podstawa
-    elems.push(
-      <line x1={mm(baseStartX)} y1={mm(baseY)} x2={mm(baseEndX)} y2={mm(baseY)} {...tailStroke} />
-    );
-    // skos do górnej ramy
-    elems.push(
-      <line x1={mm(baseEndX)} y1={mm(baseY)} x2={mm(topX)} y2={mm(topY)} {...tailStroke} />
-    );
-    // wewnętrzny skos od początku podstawy do ~60% wysokości
-    const innerX = baseStartX + dir * baseLen * 0.35;
-    const innerY = outerH * 0.4; // tylko wizual
-    elems.push(
-      <line x1={mm(baseStartX)} y1={mm(baseY)} x2={mm(innerX)} y2={mm(innerY)} {...tailStroke} />
-    );
-    // skos od czubka słupka do ~3/4 wysokości przy ramie
-    const nearFrameX = tailSide === "right" ? outerW - frameT * 0.5 : frameT * 0.5;
-    const nearFrameY = outerH * 0.25;
-    elems.push(
-      <line x1={mm(postX + frameT / 2)} y1={mm(baseY - postH)} x2={mm(nearFrameX)} y2={mm(nearFrameY)} {...tailStroke} />
-    );
-
-    // Adnotacje (tylko teksty)
-    const textStyle = {
-      paintOrder: "stroke",
-      stroke: "#fff",
-      strokeWidth: 3,
-      fontVariantNumeric: "tabular-nums",
-    } as any;
-
-    if (tailAnnBaseMM != null) {
-      const cx = (baseStartX + baseEndX) / 2;
-      elems.push(
-        <text x={mm(cx)} y={mm(baseY) - 6} fontSize={11} textAnchor="middle" style={textStyle}>
-          {`${tailAnnBaseMM} mm`}
-        </text>
+    if (tailMode === 'manual') {
+      // Tryb MANUALNY – grube profile = grubość ramy, etykiety z tailManualLabels
+      tailGroup = (
+        <TailManual
+          side={tailSide}
+          outerW={outerW}
+          outerH={outerH}
+          frameVert={frameVert}
+          scale={scale}
+          baseLen={baseLenVis}
+          labels={tailManualLabels}
+        />
       );
-    }
-    if (tailAnnDiag1MM != null) {
-      const cx = (baseEndX + topX) / 2;
-      const cy = (baseY + topY) / 2;
-      elems.push(
-        <text x={mm(cx)} y={mm(cy) - 6} fontSize={11} textAnchor="middle" style={textStyle}>
-          {`${tailAnnDiag1MM} mm`}
-        </text>
-      );
-    }
-    if (tailAnnDiag2MM != null) {
-      const cx = (baseStartX + innerX) / 2;
-      const cy = (baseY + innerY) / 2;
-      elems.push(
-        <text x={mm(cx)} y={mm(cy) - 6} fontSize={11} textAnchor="middle" style={textStyle}>
-          {`${tailAnnDiag2MM} mm`}
-        </text>
+    } else if (hO > 0) {
+      // Tryb AUTO – Twój dotychczasowy rysunek (oparty o wysięgi omegi)
+      const extL = Math.max(0, bottomOmega?.extendLeft ?? 0);
+      const extR = Math.max(0, bottomOmega?.extendRight ?? 0);
+      const dir = tailSide === "right" ? 1 : -1;
+
+      // podstawa ogona startuje na ZEWNĘTRZNEJ krawędzi omegi (z wysięgiem)
+      const baseStartX = tailSide === "right" ? outerW + extR : 0 - extL;
+      const baseY = outerH + hA + hP + hO; // dół omegi
+      const baseLen = baseLenVis; // tylko wizual
+      const baseEndX = baseStartX + dir * baseLen;
+
+      // wierzchołek na górnej krawędzi ramy po stronie ogona
+      const topX = tailSide === "right" ? outerW : 0;
+      const topY = 0;
+
+      // mały pionowy słupek ~ w połowie podstawy
+      const postX = baseStartX + dir * baseLen * 0.5 - frameT / 2;
+      const postH = Math.max(hA, 1); // taka sama wysokość jak wsporniki A (wizualnie)
+
+      const textStyle = {
+        paintOrder: "stroke",
+        stroke: "#fff",
+        strokeWidth: 3,
+        fontVariantNumeric: "tabular-nums",
+      } as any;
+
+      const tailStroke = { fill: "none", stroke, vectorEffect: "non-scaling-stroke" } as any;
+
+      tailGroup = (
+        <g>
+          {/* słupek */}
+          <rect
+            x={mm(postX)}
+            y={mm(baseY - postH)}
+            width={mm(frameT)}
+            height={mm(postH)}
+            fill={fillFrame}
+            stroke={stroke}
+            vectorEffect="non-scaling-stroke"
+          />
+          {/* podstawa */}
+          <line x1={mm(baseStartX)} y1={mm(baseY)} x2={mm(baseEndX)} y2={mm(baseY)} {...tailStroke} />
+          {/* skos do górnej ramy */}
+          <line x1={mm(baseEndX)} y1={mm(baseY)} x2={mm(topX)} y2={mm(topY)} {...tailStroke} />
+          {/* wewnętrzny skos od początku podstawy */}
+          {(() => {
+            const innerX = baseStartX + dir * baseLen * 0.35;
+            const innerY = outerH * 0.4;
+            return <line x1={mm(baseStartX)} y1={mm(baseY)} x2={mm(innerX)} y2={mm(innerY)} {...tailStroke} />;
+          })()}
+          {/* skos od czubka słupka w stronę ramy */}
+          {(() => {
+            const nearFrameX = tailSide === "right" ? outerW - frameT * 0.5 : frameT * 0.5;
+            const nearFrameY = outerH * 0.25;
+            return <line x1={mm(postX + frameT / 2)} y1={mm(baseY - postH)} x2={mm(nearFrameX)} y2={mm(nearFrameY)} {...tailStroke} />;
+          })()}
+
+          {/* Adnotacje (jeśli podane) */}
+          {tailAnnBaseMM != null && (
+            <text x={mm((baseStartX + baseEndX) / 2)} y={mm(baseY) - 6} fontSize={11} textAnchor="middle" style={textStyle}>
+              {`${tailAnnBaseMM} mm`}
+            </text>
+          )}
+          {tailAnnDiag1MM != null && (
+            <text x={mm((baseEndX + topX) / 2)} y={mm((baseY + topY) / 2) - 6} fontSize={11} textAnchor="middle" style={textStyle}>
+              {`${tailAnnDiag1MM} mm`}
+            </text>
+          )}
+          {tailAnnDiag2MM != null && (() => {
+            const innerX = baseStartX + dir * baseLen * 0.35;
+            const innerY = outerH * 0.4;
+            return (
+              <text x={mm((baseStartX + innerX) / 2)} y={mm((baseY + innerY) / 2) - 6} fontSize={11} textAnchor="middle" style={textStyle}>
+                {`${tailAnnDiag2MM} mm`}
+              </text>
+            );
+          })()}
+        </g>
       );
     }
   }
@@ -622,7 +635,8 @@ export default function LayoutBlock({
 
   return (
     <g>
-      {elems /* panele + przerwy + wzmocnienia + Przestrzeń 2 + ogon */}
+      {elems /* panele + przerwy + wzmocnienia + Przestrzeń 2 */}
+      {tailGroup /* ogon manual/auto */}
       {frame /* rama na wierzchu */}
       {dims}
     </g>
