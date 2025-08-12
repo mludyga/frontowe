@@ -1,6 +1,6 @@
 import type { JSX } from "react";
-import TailManual from './TailManual';
-import type { TailMode, TailManualLabels } from '../types/tail';
+import TailManual from "./TailManual";
+import type { TailMode, TailManualLabels } from "../types/tail";
 
 /** Stała szerokości kolumny z etykietami */
 export const LABEL_COL_MM = 148;
@@ -29,30 +29,34 @@ export type LayoutProps = {
     height: number;
   };
 
-  /** Przestrzeń 2 – omega (najniżej) + wysięgi L/P */
+  /** Przestrzeń 2 – omega (najniżej) + ewentualne wysięgi (wyłączane w trybie ogona-manual) */
   bottomOmega?: {
     height: number;
-    extendLeft?: number;   // ile wystaje w lewo (mm)
-    extendRight?: number;  // ile wystaje w prawo (mm)
+    extendLeft?: number;
+    extendRight?: number;
   };
 
   /** Czy rysować etykiety szerokości światła między pionami */
   showProfileWidths?: boolean;
 
-  /** OGON (wizualny; wyłącznie dla bramy przesuwnej) */
+  /** OGON */
   tailEnabled?: boolean;
-  tailSide?: "left" | "right"; // domyślnie "right"
+  tailSide?: "left" | "right";
   /** długość podstawy ogona jako ułamek wysokości korpusu (np. 0.8) */
   tailVisBaseFrac?: number;
 
-  /** Adnotacje (teksty w mm) – tylko wyświetlamy (AUTO) */
+  /** AUTO – tylko etykiety (opcjonalnie) */
   tailAnnBaseMM?: number | null;
   tailAnnDiag1MM?: number | null;
   tailAnnDiag2MM?: number | null;
 
-  /** Tryb ogona i etykiety do trybu manualnego */
-  tailMode?: TailMode;                          // 'auto' | 'manual'
+  /** MANUAL */
+  tailMode?: TailMode; // 'auto' | 'manual'
   tailManualLabels?: TailManualLabels;
+  /** ułamek L, gdzie zaczyna się skos #2 (np. 0.6) */
+  tailSkew2Frac?: number;
+  /** ułamek L dla przedłużenia dolnej ramy (np. 0.5) */
+  tailBottomExtFrac?: number;
 };
 
 export default function LayoutBlock({
@@ -75,26 +79,27 @@ export default function LayoutBlock({
   tailAnnBaseMM,
   tailAnnDiag1MM,
   tailAnnDiag2MM,
-  tailMode = 'auto',
+  tailMode = "auto",
   tailManualLabels,
+  tailSkew2Frac = 0.6,
+  tailBottomExtFrac = 0.5,
 }: LayoutProps) {
   const stroke = "#333";
   const fillFrame = "#94a3b8";
 
-  // --- geometra korpusu ---
+  // --- geometria korpusu ---
   const frameT = withFrame ? frameVert : 0;
   const innerX = frameT;
   const innerY = frameT;
   const innerW = Math.max(0, outerW - 2 * frameT);
   const innerH = Math.max(0, outerH - 2 * frameT);
 
-  // --- Przestrzeń 2 – wysokości składowych (A, profil, omega) ---
+  // --- Przestrzeń 2 – wysokości składowych ---
   const hA = Math.max(0, bottomSupports?.height ?? 0);
   const hP = Math.max(0, bottomProfile?.height ?? 0);
   const hO = Math.max(0, bottomOmega?.height ?? 0);
   const totalH = outerH + hA + hP + hO;
 
-  // pomocnicze
   const mm = (v: number) => v * scale;
 
   function rect(
@@ -304,7 +309,7 @@ export default function LayoutBlock({
 
   // === PRZESTRZEŃ 2 (pod korpusem, od góry: A -> profil -> omega) ===
 
-  // 1) wsporniki A (krótkie, pod dolną ramą korpusu)
+  // 1) wsporniki A
   if (hA > 0 && bottomSupports?.xs?.length) {
     const yTop = outerH * scale;           // start tuż pod korpusem
     const H = hA * scale;
@@ -360,11 +365,11 @@ export default function LayoutBlock({
     );
   }
 
-  // 3) OMEGA (najniżej) z wysięgami
+  // 3) OMEGA (najniżej) — przy ogonie-manual nie rysujemy wysięgów z propsów
   if (hO > 0) {
     const y = (outerH + hA + hP) * scale;
-    const extL = Math.max(0, bottomOmega?.extendLeft ?? 0);
-    const extR = Math.max(0, bottomOmega?.extendRight ?? 0);
+    const extL = tailEnabled && tailMode === "manual" ? 0 : Math.max(0, bottomOmega?.extendLeft ?? 0);
+    const extR = tailEnabled && tailMode === "manual" ? 0 : Math.max(0, bottomOmega?.extendRight ?? 0);
 
     // korpusowa część omegi
     elems.push(
@@ -463,105 +468,64 @@ export default function LayoutBlock({
     });
   }
 
-  // --- OGON (wizualny) ---
-  let tailGroup: JSX.Element | null = null;
-
-  if (tailEnabled) {
-    const baseLenVis = Math.max(outerH * tailVisBaseFrac, 0);
-
-    if (tailMode === 'manual') {
-      // Tryb MANUALNY – grube profile = grubość ramy, etykiety z tailManualLabels
-      tailGroup = (
+  // --- OGON ---
+  if (tailEnabled && hO > 0) {
+    if (tailMode === "manual") {
+      // manual: przedłużenie omegi, skosy, przedłużenie dolnej ramy – grubość = omega/frame
+      elems.push(
         <TailManual
           side={tailSide}
-          outerW={outerW}
+          outerW={outerW}                     // <-- poprawka: zawsze szerokość korpusu
           outerH={outerH}
-          frameVert={frameVert}
-          scale={scale}
-          baseLen={baseLenVis}
+          frameT={frameT}
+          omegaH={hO}
+          omegaTopY={outerH + hA + hP}
+          visBaseFrac={tailVisBaseFrac}
+          skew2Frac={tailSkew2Frac}
+          bottomExtFrac={tailBottomExtFrac}
           labels={tailManualLabels}
+          scale={scale}
+          stroke={stroke}
+          fillFrame={fillFrame}
         />
       );
-    } else if (hO > 0) {
-      // Tryb AUTO – Twój dotychczasowy rysunek (oparty o wysięgi omegi)
-      const extL = Math.max(0, bottomOmega?.extendLeft ?? 0);
-      const extR = Math.max(0, bottomOmega?.extendRight ?? 0);
+    } else {
+      // auto – jak wcześniej (poglądowy trójkąt + 2 linie) + etykiety mm (jeśli podane)
       const dir = tailSide === "right" ? 1 : -1;
-
-      // podstawa ogona startuje na ZEWNĘTRZNEJ krawędzi omegi (z wysięgiem)
-      const baseStartX = tailSide === "right" ? outerW + extR : 0 - extL;
-      const baseY = outerH + hA + hP + hO; // dół omegi
-      const baseLen = baseLenVis; // tylko wizual
+      const baseStartX = tailSide === "right" ? outerW : 0;
+      const baseY = outerH + hA + hP + hO;
+      const baseLen = Math.max(outerH * tailVisBaseFrac, 0);
       const baseEndX = baseStartX + dir * baseLen;
-
-      // wierzchołek na górnej krawędzi ramy po stronie ogona
       const topX = tailSide === "right" ? outerW : 0;
       const topY = 0;
 
-      // mały pionowy słupek ~ w połowie podstawy
-      const postX = baseStartX + dir * baseLen * 0.5 - frameT / 2;
-      const postH = Math.max(hA, 1); // taka sama wysokość jak wsporniki A (wizualnie)
-
-      const textStyle = {
-        paintOrder: "stroke",
-        stroke: "#fff",
-        strokeWidth: 3,
-        fontVariantNumeric: "tabular-nums",
-      } as any;
-
       const tailStroke = { fill: "none", stroke, vectorEffect: "non-scaling-stroke" } as any;
+      const textStyle = { paintOrder: "stroke", stroke: "#fff", strokeWidth: 3, fontVariantNumeric: "tabular-nums" } as any;
 
-      tailGroup = (
-        <g>
-          {/* słupek */}
-          <rect
-            x={mm(postX)}
-            y={mm(baseY - postH)}
-            width={mm(frameT)}
-            height={mm(postH)}
-            fill={fillFrame}
-            stroke={stroke}
-            vectorEffect="non-scaling-stroke"
-          />
-          {/* podstawa */}
-          <line x1={mm(baseStartX)} y1={mm(baseY)} x2={mm(baseEndX)} y2={mm(baseY)} {...tailStroke} />
-          {/* skos do górnej ramy */}
-          <line x1={mm(baseEndX)} y1={mm(baseY)} x2={mm(topX)} y2={mm(topY)} {...tailStroke} />
-          {/* wewnętrzny skos od początku podstawy */}
-          {(() => {
-            const innerX = baseStartX + dir * baseLen * 0.35;
-            const innerY = outerH * 0.4;
-            return <line x1={mm(baseStartX)} y1={mm(baseY)} x2={mm(innerX)} y2={mm(innerY)} {...tailStroke} />;
-          })()}
-          {/* skos od czubka słupka w stronę ramy */}
-          {(() => {
-            const nearFrameX = tailSide === "right" ? outerW - frameT * 0.5 : frameT * 0.5;
-            const nearFrameY = outerH * 0.25;
-            return <line x1={mm(postX + frameT / 2)} y1={mm(baseY - postH)} x2={mm(nearFrameX)} y2={mm(nearFrameY)} {...tailStroke} />;
-          })()}
+      elems.push(<line x1={mm(baseStartX)} y1={mm(baseY)} x2={mm(baseEndX)} y2={mm(baseY)} {...tailStroke} />);
+      elems.push(<line x1={mm(baseEndX)} y1={mm(baseY)} x2={mm(topX)} y2={mm(topY)} {...tailStroke} />);
 
-          {/* Adnotacje (jeśli podane) */}
-          {tailAnnBaseMM != null && (
-            <text x={mm((baseStartX + baseEndX) / 2)} y={mm(baseY) - 6} fontSize={11} textAnchor="middle" style={textStyle}>
-              {`${tailAnnBaseMM} mm`}
-            </text>
-          )}
-          {tailAnnDiag1MM != null && (
-            <text x={mm((baseEndX + topX) / 2)} y={mm((baseY + topY) / 2) - 6} fontSize={11} textAnchor="middle" style={textStyle}>
-              {`${tailAnnDiag1MM} mm`}
-            </text>
-          )}
-          {tailAnnDiag2MM != null && (() => {
-            const innerX = baseStartX + dir * baseLen * 0.35;
-            const innerY = outerH * 0.4;
-            return (
-              <text x={mm((baseStartX + innerX) / 2)} y={mm((baseY + innerY) / 2) - 6} fontSize={11} textAnchor="middle" style={textStyle}>
-                {`${tailAnnDiag2MM} mm`}
-              </text>
-            );
-          })()}
-        </g>
-      );
+      const innerX = baseStartX + dir * baseLen * 0.35;
+      const innerY = outerH * 0.4;
+      elems.push(<line x1={mm(baseStartX)} y1={mm(baseY)} x2={mm(innerX)} y2={mm(innerY)} {...tailStroke} />);
+      const nearFrameX = tailSide === "right" ? outerW - frameT * 0.5 : frameT * 0.5;
+      const nearFrameY = outerH * 0.25;
+      elems.push(<line x1={mm(nearFrameX)} y1={mm(nearFrameY)} x2={mm(baseEndX)} y2={mm(baseY)} {...tailStroke} />);
+
+      if (tailAnnBaseMM != null) {
+        const cx = (baseStartX + baseEndX) / 2;
+        elems.push(<text x={mm(cx)} y={mm(baseY) - 6} fontSize={11} textAnchor="middle" style={textStyle}>{`${tailAnnBaseMM} mm`}</text>);
+      }
+      if (tailAnnDiag1MM != null) {
+        const cx = (baseEndX + topX) / 2;
+        const cy = (baseY + topY) / 2;
+        elems.push(<text x={mm(cx)} y={mm(cy) - 6} fontSize={11} textAnchor="middle" style={textStyle}>{`${tailAnnDiag1MM} mm`}</text>);
+      }
+      if (tailAnnDiag2MM != null) {
+        const cx = (baseStartX + innerX) / 2;
+        const cy = (baseY + innerY) / 2;
+        elems.push(<text x={mm(cx)} y={mm(cy) - 6} fontSize={11} textAnchor="middle" style={textStyle}>{`${tailAnnDiag2MM} mm`}</text>);
+      }
     }
   }
 
@@ -635,8 +599,7 @@ export default function LayoutBlock({
 
   return (
     <g>
-      {elems /* panele + przerwy + wzmocnienia + Przestrzeń 2 */}
-      {tailGroup /* ogon manual/auto */}
+      {elems /* panele + przerwy + wzmocnienia + Przestrzeń 2 + napisy */}
       {frame /* rama na wierzchu */}
       {dims}
     </g>
