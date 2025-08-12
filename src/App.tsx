@@ -69,8 +69,9 @@ export default function App() {
   const [gateType, setGateType] = useState<GateType>("none");
   const [gateWidth, setGateWidth] = useState<number>(4000);
   const [gateHeight, setGateHeight] = useState<number>(1400);
-  const [gateEqualBays] = useState<boolean>(true);
 
+  // równe światła dla bramy przesuwnej (przy dwóch wzmocnieniach)
+  const [gateEqualBays, setGateEqualBays] = useState<boolean>(true);
 
   // Przestrzeń 2 – BRAMA
   const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
@@ -85,11 +86,22 @@ export default function App() {
   const [gateOmegaExtLeft, setGateOmegaExtLeft] = useState<number>(0);
   const [gateOmegaExtRight, setGateOmegaExtRight] = useState<number>(0);
 
+  // OGON – tylko brama przesuwna
+  const [gateTailEnabled, setGateTailEnabled] = useState<boolean>(false);
+  const [gateTailSide, setGateTailSide] = useState<"left" | "right">("right");
+  const [gateTailLabelBase, setGateTailLabelBase] = useState<string>("");
+  const [gateTailLabelLower, setGateTailLabelLower] = useState<string>("");
+  const [gateTailLabelSupport, setGateTailLabelSupport] = useState<string>("");
+  const [gateTailLabelDiag, setGateTailLabelDiag] = useState<string>("");
+  const [gateTailBaseFrac, setGateTailBaseFrac] = useState<number>(0.35);
+  const [gateTailLowerFrac, setGateTailLowerFrac] = useState<number>(0.5);
+  const [gateTailHighFrac, setGateTailHighFrac] = useState<number>(0.75);
+
   // FURTKA – wymiary
   const [wicketWidth, setWicketWidth] = useState<number>(1000);
   const [wicketHeight, setWicketHeight] = useState<number>(1400);
 
-  // FURTKA – Przestrzeń 2 (osobno!)
+  // FURTKA – Przestrzeń 2 (osobno)
   const [wicketBottomEnabled, setWicketBottomEnabled] = useState<boolean>(false);
   const [wicketBottomSupportH, setWicketBottomSupportH] = useState<number>(80);
   const [wicketBottomExtraPerSpan, setWicketBottomExtraPerSpan] = useState<number>(0);
@@ -100,7 +112,7 @@ export default function App() {
   const [wicketOmegaEnabled, setWicketOmegaEnabled] = useState<boolean>(false);
   const [wicketOmegaH, setWicketOmegaH] = useState<number>(80);
 
-  // dodatkowe panele – BRAMA / FURTKA (jak w Twojej wersji)
+  // dodatkowe panele – BRAMA / FURTKA
   const [gateExtraPanels, setGateExtraPanels] = useState<number[]>([]);
   const [gateGapAfterBase, setGateGapAfterBase] = useState<number>(0);
   const [gateGapBetweenExtras, setGateGapBetweenExtras] = useState<number>(0);
@@ -204,7 +216,6 @@ export default function App() {
     const out: number[] = [];
     let ap = 0;
     for (let i = 0; i < expected; i++) out.push(round2(vec[i].value == null ? autosVals[ap++] : vec[i].value!));
-    // drobna korekta na końcu (0.5 mm prog)
     const corr = spanInternalHeight - sumPanels - sum(out);
     if (Math.abs(corr) >= 0.5) out[out.length - 1] = round2(out[out.length - 1] + corr);
     return { gaps: out, error: "" };
@@ -331,30 +342,30 @@ export default function App() {
 
   // --- wzmocnienia pionowe dla bramy przesuwnej (X w mm od lewej) ---
   const slidingVerticalBars = useMemo(() => {
-  if (gateType !== "przesuwna") return [];
-  const f = frameVert;
-  const innerW = Math.max(0, gateWidth - 2 * f);
-  if (innerW <= 0) return [];
+    if (gateType !== "przesuwna") return [];
+    const f = frameVert;
+    const innerW = Math.max(0, gateWidth - 2 * f);
+    if (innerW <= 0) return [];
 
-  // < 5 m: jedno wzmocnienie (pośrodku) — daje dwa równe światła
-  if (gateWidth < 5000) {
-    return [f + innerW / 2 - f / 2]; // x-lewa krawędź wzmocnienia
-  }
+    // < 5 m: jedno wzmocnienie (pośrodku) — daje dwa równe światła
+    if (gateWidth < 5000) {
+      return [f + innerW / 2 - f / 2]; // x-lewa krawędź wzmocnienia
+    }
 
-  // ≥ 5 m: dwa wzmocnienia
-  if (gateEqualBays) {
-    // równe światła: 3S + 2f = innerW  =>  S = (innerW - 2f)/3
-    const S = (innerW - 2 * f) / 3;
-    const x1 = f + S;       // lewa krawędź 1. wzmocnienia
-    const x2 = f + 2 * S + f; // lewa krawędź 2. wzmocnienia
-    return [x1, x2];
-  } else {
-    // stary wariant: „co ~1/3” (światła nie są identyczne)
-    return [f + innerW / 3 - f / 2, f + (2 * innerW) / 3 - f / 2];
-  }
-}, [gateType, gateWidth, frameVert, gateEqualBays]);
+    // ≥ 5 m: dwa wzmocnienia
+    if (gateEqualBays) {
+      // równe światła: 3S + 2f = innerW  =>  S = (innerW - 2f)/3
+      const S = (innerW - 2 * f) / 3;
+      const x1 = f + S;          // lewa krawędź 1. wzmocnienia
+      const x2 = f + 2 * S + f;  // lewa krawędź 2. wzmocnienia
+      return [x1, x2];
+    } else {
+      // „co ~1/3” (światła nie są identyczne)
+      return [f + innerW / 3 - f / 2, f + (2 * innerW) / 3 - f / 2];
+    }
+  }, [gateType, gateWidth, frameVert, gateEqualBays]);
 
-  // --- pozycje krótkich wsporników ---
+  // --- pozycje krótkich wsporników (A) – brama
   const gateBottomXs = useMemo(() => {
     if (gateType === "none" || !gateBottomEnabled) return [];
     const anchors: number[] = [];
@@ -379,11 +390,13 @@ export default function App() {
     return out.sort((a, b) => a - b);
   }, [gateType, gateWidth, frameVert, slidingVerticalBars, gateBottomEnabled, gateBottomExtraPerSpan]);
 
+  // --- pozycje krótkich wsporników (A) – furtka
   const wicketBottomXs = useMemo(() => {
     if (gateType === "none" || !wicketBottomEnabled) return [];
     const anchors: number[] = [];
     const f = frameVert;
     anchors.push(0, wicketWidth - f);
+
     const uniq = Array.from(new Set(anchors.map((a) => Math.round(a * 1000) / 1000))).sort((a, b) => a - b);
     const out: number[] = [...uniq];
 
@@ -469,6 +482,7 @@ export default function App() {
 
   // --- wymiary całego rysunku (w mm, przed skalą) ---
   const gateOmegaExtraW = gateOmegaEnabled ? gateOmegaExtLeft + gateOmegaExtRight : 0;
+
   const totalWidthMM = useMemo(() => {
     let w = 0;
     w += spanWidth + LABEL_COL_MM;
@@ -488,7 +502,7 @@ export default function App() {
     return h + TOP_MARGIN_MM + 60;
   }, [spanHeight, gateType, gateHeight, wicketHeight, gateExtraH, wicketExtraH]);
 
-  // Profile widths (dla headera – opcjonalne)
+  // Profile widths (do podsumowania)
   const spanProfileW = hasFrame ? computeProfileWidths(spanWidth, frameVert) : [];
   const gateProfileW =
     gateType === "przesuwna"
@@ -737,6 +751,17 @@ export default function App() {
                 />
               </label>
 
+              {gateType === "przesuwna" && (
+                <label className="flex items-center gap-2 mt-1">
+                  <input
+                    type="checkbox"
+                    checked={gateEqualBays}
+                    onChange={(e) => setGateEqualBays(e.currentTarget.checked)}
+                  />
+                  <span>Równe światła między wzmocnieniami</span>
+                </label>
+              )}
+
               {/* BRAMA – Przestrzeń 2 */}
               <div className="mt-3 font-medium">Przestrzeń 2 – BRAMA</div>
               <div className="space-y-2">
@@ -791,6 +816,84 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              {/* OGON – tylko dla przesuwnej */}
+              {gateType === "przesuwna" && (
+                <div className="mt-3 font-medium">
+                  Ogon (schematyczny)
+                  <div className="mt-1 space-y-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={gateTailEnabled}
+                        onChange={(e) => setGateTailEnabled(e.currentTarget.checked)}
+                      />
+                      <span>Pokaż ogon</span>
+                    </label>
+                    {gateTailEnabled && (
+                      <>
+                        <div className="flex items-center gap-4">
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="tailSide"
+                              checked={gateTailSide === "left"}
+                              onChange={() => setGateTailSide("left")}
+                            />
+                            Lewy
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="tailSide"
+                              checked={gateTailSide === "right"}
+                              onChange={() => setGateTailSide("right")}
+                            />
+                            Prawy
+                          </label>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-2">
+                          <label className="block">
+                            Etykieta bazowa
+                            <input className="input" value={gateTailLabelBase} onChange={(e) => setGateTailLabelBase(e.currentTarget.value)} />
+                          </label>
+                          <label className="block">
+                            Etykieta dolnego przedł.
+                            <input className="input" value={gateTailLabelLower} onChange={(e) => setGateTailLabelLower(e.currentTarget.value)} />
+                          </label>
+                          <label className="block">
+                            Etykieta wspornika
+                            <input className="input" value={gateTailLabelSupport} onChange={(e) => setGateTailLabelSupport(e.currentTarget.value)} />
+                          </label>
+                          <label className="block">
+                            Etykieta skosu
+                            <input className="input" value={gateTailLabelDiag} onChange={(e) => setGateTailLabelDiag(e.currentTarget.value)} />
+                          </label>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4">
+                          <label className="block">
+                            Dł. bazowa (proporcja)
+                            <input type="range" min={0.1} max={0.8} step={0.01} value={gateTailBaseFrac} onChange={(e) => setGateTailBaseFrac(e.currentTarget.valueAsNumber || 0.35)} />
+                            <div className="text-xs text-gray-600">{gateTailBaseFrac.toFixed(2)}</div>
+                          </label>
+                          <label className="block">
+                            Dolne przedł. (proporcja)
+                            <input type="range" min={0.1} max={1} step={0.01} value={gateTailLowerFrac} onChange={(e) => setGateTailLowerFrac(e.currentTarget.valueAsNumber || 0.5)} />
+                            <div className="text-xs text-gray-600">{gateTailLowerFrac.toFixed(2)}</div>
+                          </label>
+                          <label className="block">
+                            Wys. skosu (proporcja)
+                            <input type="range" min={0.2} max={0.95} step={0.01} value={gateTailHighFrac} onChange={(e) => setGateTailHighFrac(e.currentTarget.valueAsNumber || 0.75)} />
+                            <div className="text-xs text-gray-600">{gateTailHighFrac.toFixed(2)}</div>
+                          </label>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* BRAMA – dodatkowe panele */}
               <div className="mt-3 font-medium">Dodatkowe panele – tylko BRAMA</div>
@@ -1086,10 +1189,10 @@ export default function App() {
             {[
               `Przęsło – panele: ${fmt2(sumPanels)}; przerwy: ${fmt2(sumSpanGaps)}; rama: ${hasFrame ? 2 * frameVert : 0}; suma: ${fmt2(spanTotalByParts)} (zadane: ${fmt2(spanHeight)}); szer. profilu: ${spanProfileW.join("/") || "-"}`,
               gate && gateTotals
-                ? `Brama – panele: ${fmt2(gateTotals.p)}; przerwy: ${fmt2(gateTotals.gsum)}; rama: ${2 * frameVert}; suma: ${fmt2(gateTotals.total)} (zadane: ${fmt2(gateHeight)}); szer. profili: ${gateProfileW.join("/") || "-"}`
+                ? `Brama – panele: ${fmt2(gateTotals.p)}; przerwy: ${fmt2(gateTotals.gsum)}; rama: ${2 * frameVert}; suma: ${fmt2(gateTotals.total)} (zadane: ${fmt2(gateHeight)}); szer. profili: ${gateProfileW.join("/") || "-"}` 
                 : null,
               wicket && wicketTotals
-                ? `Furtka – panele: ${fmt2(wicketTotals.p)}; przerwy: ${fmt2(wicketTotals.gsum)}; rama: ${2 * frameVert}; suma: ${fmt2(wicketTotals.total)} (zadane: ${fmt2(wicketHeight)}); szer. profilu: ${wicketProfileW.join("/") || "-"}`
+                ? `Furtka – panele: ${fmt2(wicketTotals.p)}; przerwy: ${fmt2(wicketTotals.gsum)}; rama: ${2 * frameVert}; suma: ${fmt2(wicketTotals.total)} (zadane: ${fmt2(wicketHeight)}); szer. profilu: ${wicketProfileW.join("/") || "-"}` 
                 : null,
             ]
               .filter(Boolean)
@@ -1117,7 +1220,6 @@ export default function App() {
                   panels={panelList}
                   scale={scale}
                   frameVert={frameVert}
-                  showProfileWidths={hasFrame}
                 />
               </g>
             );
@@ -1136,6 +1238,17 @@ export default function App() {
               bottomSupports: gateBottomEnabled ? { height: gateBottomSupportH, xs: gateBottomXs } : undefined,
               bottomProfile: gateBottomProfileEnabled ? { height: gateBottomProfileH } : undefined,
               bottomOmega: gateOmegaEnabled ? { height: gateOmegaH, extendLeft: gateOmegaExtLeft, extendRight: gateOmegaExtRight } : undefined,
+              tail: gateType === "przesuwna" ? {
+                enabled: gateTailEnabled,
+                side: gateTailSide,
+                labelBaseLen: gateTailLabelBase || undefined,
+                labelLowerExt: gateTailLabelLower || undefined,
+                labelSupportH: gateTailLabelSupport || undefined,
+                labelDiagHigh: gateTailLabelDiag || undefined,
+                visBaseFrac: gateTailBaseFrac,
+                visLowerExtFrac: gateTailLowerFrac,
+                visDiagHighFrac: gateTailHighFrac,
+              } : undefined
             } as const;
 
             const gateBlock = gate ? (
@@ -1150,7 +1263,6 @@ export default function App() {
                     panels={gate.panels}
                     scale={scale}
                     frameVert={frameVert}
-                    showProfileWidths
                     {...bottomGate}
                   />
                   <g transform={`translate(${(gateWidth / 2 + 10) * scale}, 0)`}>
@@ -1163,7 +1275,6 @@ export default function App() {
                       panels={gate.panels}
                       scale={scale}
                       frameVert={frameVert}
-                      showProfileWidths
                       {...bottomGate}
                     />
                   </g>
@@ -1180,7 +1291,6 @@ export default function App() {
                     scale={scale}
                     frameVert={frameVert}
                     verticalBars={slidingVerticalBars}
-                    showProfileWidths
                     {...bottomGate}
                   />
                 </g>
@@ -1197,7 +1307,7 @@ export default function App() {
                 spanWidth +
                 LABEL_COL_MM +
                 MODULE_GUTTER_MM +
-                (gateOmegaEnabled ? gateOmegaExtLeft : 0) + // jeśli gate wysuwa się w lewo, brama jest odsunięta – furtka liczy od nowej pozycji
+                (gateOmegaEnabled ? gateOmegaExtLeft : 0) + // brama odsunięta w lewo
                 gateWidthWithLabels +
                 (gateOmegaEnabled ? gateOmegaExtRight : 0) + // miejsce na wysięg w prawo
                 MODULE_GUTTER_MM) *
@@ -1220,7 +1330,6 @@ export default function App() {
                   panels={wicket.panels}
                   scale={scale}
                   frameVert={frameVert}
-                  showProfileWidths
                   {...bottomWicket}
                 />
               </g>
@@ -1297,8 +1406,8 @@ export default function App() {
 
       <div className="text-xs text-gray-500">
         * Zaokrąglanie do 0,01 mm. Panele są wyrównane pionowo między elementami.
-        Brama skrzydłowa rysowana jako dwa równe skrzydła; brama przesuwna ma pionowe wzmocnienia zależnie od szerokości.
-        „Przestrzeń 2” (wsporniki / profil / omega) jest rysowana pod dolną ramą i wliczana do wysokości całkowitej.
+        Brama skrzydłowa rysowana jako dwa równe skrzydła; brama przesuwna ma pionowe wzmocnienia zależnie od szerokości (z opcją równych świateł).
+        „Przestrzeń 2” (A/B/Ω) jest rysowana pod dolną ramą i wliczana do wysokości całkowitej. „Ogon” jest schematyczny – nie wpływa na wymiary.
       </div>
     </div>
   );
