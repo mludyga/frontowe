@@ -871,39 +871,53 @@ export default function App() {
                           onChange={(e) => setTailVisBaseFrac(e.currentTarget.valueAsNumber || 0.8)}
                         />
                       </label>
-                      <div className="grid md:grid-cols-3 gap-2 mt-2">
-                        <label className="block">
-                          Adnotacja – podstawa (mm)
-                          <input
-                            type="number"
-                            className="input"
-                            value={tailAnnBaseMM ?? ""}
-                            onChange={(e) => setTailAnnBaseMM(Number.isFinite(e.currentTarget.valueAsNumber) ? e.currentTarget.valueAsNumber : null)}
-                          />
-                        </label>
-                        <label className="block">
-                          Adnotacja – skos 1 (mm)
-                          <input
-                            type="number"
-                            className="input"
-                            value={tailAnnDiag1MM ?? ""}
-                            onChange={(e) => setTailAnnDiag1MM(Number.isFinite(e.currentTarget.valueAsNumber) ? e.currentTarget.valueAsNumber : null)}
-                          />
-                        </label>
-                        <label className="block">
-                          Adnotacja – skos 2 (mm)
-                          <input
-                            type="number"
-                            className="input"
-                            value={tailAnnDiag2MM ?? ""}
-                            onChange={(e) => setTailAnnDiag2MM(Number.isFinite(e.currentTarget.valueAsNumber) ? e.currentTarget.valueAsNumber : null)}
-                          />
-                        </label>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
+                     {tailMode === 'manual' ? (
+  <div className="grid md:grid-cols-2 gap-2 mt-2">
+    <input className="input" placeholder="Pion – etykieta"
+           value={tailLabels.vertical ?? ''} onChange={(e) => updateTailLabel('vertical', e.currentTarget.value)} />
+    <input className="input" placeholder="Przekątna – etykieta"
+           value={tailLabels.diagonal ?? ''} onChange={(e) => updateTailLabel('diagonal', e.currentTarget.value)} />
+    <input className="input" placeholder="Podstawa – etykieta"
+           value={tailLabels.base ?? ''} onChange={(e) => updateTailLabel('base', e.currentTarget.value)} />
+    <input className="input" placeholder="Omega – etykieta"
+           value={tailLabels.omega ?? ''} onChange={(e) => updateTailLabel('omega', e.currentTarget.value)} />
+    <input className="input" placeholder="Wspornik – etykieta"
+           value={tailLabels.support ?? ''} onChange={(e) => updateTailLabel('support', e.currentTarget.value)} />
+    <div className="col-span-full text-xs text-gray-600">
+      W trybie manualnym wszystkie elementy ogona mają grubość = <b>grubość ramy</b>. Powyższe pola to czysty tekst na rysunku.
+    </div>
+  </div>
+) : (
+  <div className="grid md:grid-cols-3 gap-2 mt-2">
+    <label className="block">
+      Adnotacja – podstawa (mm)
+      <input
+        type="number"
+        className="input"
+        value={tailAnnBaseMM ?? ""}
+        onChange={(e) => setTailAnnBaseMM(Number.isFinite(e.currentTarget.valueAsNumber) ? e.currentTarget.valueAsNumber : null)}
+      />
+    </label>
+    <label className="block">
+      Adnotacja – skos 1 (mm)
+      <input
+        type="number"
+        className="input"
+        value={tailAnnDiag1MM ?? ""}
+        onChange={(e) => setTailAnnDiag1MM(Number.isFinite(e.currentTarget.valueAsNumber) ? e.currentTarget.valueAsNumber : null)}
+      />
+    </label>
+    <label className="block">
+      Adnotacja – skos 2 (mm)
+      <input
+        type="number"
+        className="input"
+        value={tailAnnDiag2MM ?? ""}
+        onChange={(e) => setTailAnnDiag2MM(Number.isFinite(e.currentTarget.valueAsNumber) ? e.currentTarget.valueAsNumber : null)}
+      />
+    </label>
+  </div>
+)}
 
               {/* BRAMA – dodatkowe panele */}
               <div className="mt-3 font-medium">Dodatkowe panele – tylko BRAMA</div>
