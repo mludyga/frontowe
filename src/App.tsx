@@ -471,8 +471,7 @@ export default function App() {
 
   const gateLeftExtras = (gateOmegaEnabled ? gateOmegaExtLeft : 0) + (tailEnabled && gateType === "przesuwna" && tailSide === "left" ? tailBaseLen : 0);
   const gateRightExtras = (gateOmegaEnabled ? gateOmegaExtRight : 0) + (tailEnabled && gateType === "przesuwna" && tailSide === "right" ? tailBaseLen : 0);
-  const gateOmegaExtraW = gateOmegaEnabled ? gateOmegaExtLeft + gateOmegaExtRight : 0;
-
+  
   const totalWidthMM = useMemo(() => {
     let w = 0;
     w += spanWidth + LABEL_COL_MM;
