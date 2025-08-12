@@ -1272,23 +1272,27 @@ const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
             } as const;
 
             const tailProps =
-              gateType === "przesuwna"
-                ? {
-                    tailEnabled,
-                    tailSide,
-                    tailVisBaseFrac,
-                    tailAnnBaseMM,
-                    tailAnnDiag1MM,
-                    tailAnnDiag2MM,
-                  }
-                : {
-                    tailEnabled: false,
-                    tailSide: "right" as const,
-                    tailVisBaseFrac: 0.8,
-                    tailAnnBaseMM: null as number | null,
-                    tailAnnDiag1MM: null as number | null,
-                    tailAnnDiag2MM: null as number | null,
-                  };
+  gateType === "przesuwna"
+    ? {
+        tailEnabled,
+        tailSide,
+        tailVisBaseFrac,
+        tailAnnBaseMM,
+        tailAnnDiag1MM,
+        tailAnnDiag2MM,
+        tailMode,                 // NEW
+        tailManualLabels: tailLabels, // NEW
+      }
+    : {
+        tailEnabled: false,
+        tailSide: "right" as const,
+        tailVisBaseFrac: 0.8,
+        tailAnnBaseMM: null as number | null,
+        tailAnnDiag1MM: null as number | null,
+        tailAnnDiag2MM: null as number | null,
+        tailMode: 'auto' as const,      // NEW
+        tailManualLabels: {} as const,  // NEW
+      };
 
             const gateBlock = gate ? (
               gateType === "skrzydłowa" ? (
