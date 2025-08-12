@@ -433,7 +433,7 @@ export default function LayoutBlock({
     if (rightIn > start) segs.push([start, rightIn]);
     if (segs.length === 0) segs.push([frameT, rightIn]);
 
-    segs.forEach(([a, b], i) => {
+    segs.forEach(([a, b]) => {
       const cx = (a + b) / 2;
       const text = `${(b - a).toFixed(0)} mm`;
       elems.push(
