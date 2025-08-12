@@ -94,6 +94,8 @@ const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
   const [tailAnnDiag1MM, setTailAnnDiag1MM] = useState<number | null>(null);
   const [tailAnnDiag2MM, setTailAnnDiag2MM] = useState<number | null>(null);
   const [tailMode, setTailMode] = useState<TailMode>('auto'); // przełącznik manual/auto
+  const [tailSkew2Frac, setTailSkew2Frac] = useState<number>(0.6);
+  const [tailBottomExtFrac, setTailBottomExtFrac] = useState<number>(0.5);
   const [tailLabels, setTailLabels] = useState<TailManualLabels>({
   vertical: '',
   diagonal: '',
