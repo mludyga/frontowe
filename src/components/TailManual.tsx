@@ -6,16 +6,16 @@ export type TailManualProps = {
   frameT: number;    // grubość ramy
   hA: number;        // wysokość wsporników (A)
   hP: number;        // wysokość profilu pełnego
-  hO: number;        // wysokość Omegi (i grubość przedłużenia Omegi)
+  hO: number;        // wysokość Omegi (i grubość jej przedłużenia)
   scale: number;
   side: "left" | "right";
   labels?: TailManualLabels;
 
-  // opcjonalne parametry (poglądowe)
+  // parametry poglądowe (edytowalne z App – jeśli chcesz)
   visBaseFrac?: number;       // długość podstawy jako ułamek H korpusu (domyślnie 0.8)
   bottomExtFrac?: number;     // przedłużenie dolnej ramy w % podstawy (domyślnie 0.5)
-  skew2Frac?: number;         // gdzie startuje skos #2 (0..1 od początku podstawy, domyślnie 0.6)
-  skew2TargetHFrac?: number;  // na jakiej wysokości pionu kończy skos #2 (0..1, domyślnie 0.5)
+  skew2Frac?: number;         // start skosu #2 na podstawie (0..1, domyślnie 0.6)
+  skew2TargetHFrac?: number;  // wysokość końca skosu #2 na pionie (0..1, domyślnie 0.5)
 };
 
 export default function TailManual({
@@ -29,16 +29,19 @@ export default function TailManual({
   const fillFrame = "#94a3b8";
   const dir = side === "right" ? 1 : -1;
 
-  // pozycje referencyjne
+  // Referencje
   const yOmegaTop = outerH + hA + hP;     // górna krawędź Omegi
   const yBottomFrameTop = outerH - frameT;// górna krawędź dolnej ramy
-
-  // długość podstawy (pogląd) i jej położenie
   const baseLen = Math.max(0, outerH * visBaseFrac);
   const baseStartX = side === "right" ? outerW : 0;
   const baseEndX = baseStartX + dir * baseLen;
 
-  // helpery rysujące „lite” bryły (fill bez stroke)
+  // Oś elementów (żeby łączenia były idealnie „na środku” grubości)
+  const omegaAxisY = yOmegaTop + hO / 2;
+  const rightAxisX = side === "right" ? outerW - frameT / 2 : frameT / 2; // oś pionu
+  const topAxisY = frameT / 2;                                            // oś górnej ramy
+
+  // małe helpery (fill-only, bez stroke)
   const R = (x: number, y: number, w: number, h: number) => (
     <rect
       x={mm(Math.min(x, x + w))}
@@ -63,30 +66,34 @@ export default function TailManual({
       [x2 - ox, y2 - oy],
       [x1 - ox, y1 - oy],
     ];
-    const d = pts.map(p => `${mm(p[0])},${mm(p[1])}`).join(" ");
+    const d = pts.map(([px, py]) => `${mm(px)},${mm(py)}`).join(" ");
     return <polygon points={d} fill={fillFrame} vectorEffect="non-scaling-stroke" />;
   };
 
-  // 1) przedłużenie omegi – grubość = hO
+  // 1) Przedłużenie Omegi – równoległe do Omegi, grubość = hO
   const omegaExt = R(baseStartX, yOmegaTop, dir * baseLen, hO);
 
-  // 2) przedłużenie dolnej ramy – długość = bottomExtFrac * baseLen, grubość = frameT
+  // 2) Przedłużenie dolnej ramy – długość = bottomExtFrac * baseLen, grubość = frameT
   const botExtLen = baseLen * Math.max(0, Math.min(1, bottomExtFrac));
   const bottomExt = R(baseStartX, yBottomFrameTop, dir * botExtLen, frameT);
 
-  // 3) skos nr 1 – od końca omegi do górnej krawędzi pionu
-  const topCornerX = side === "right" ? outerW : 0;
-  const topCornerY = 0;
-  const skew1 = Band(baseEndX, yOmegaTop, topCornerX, topCornerY, frameT);
+  // 3) Skos #1 – oś od końca przedłużenia Omegi do osi górnej/prawej ramy
+  const skew1 = Band(
+    baseEndX,            // start po osi Omegi -> bierzemy oś w Y
+    omegaAxisY,
+    rightAxisX,          // koniec po osi narożnika (x po osi pionu, y po osi górnej ramy)
+    topAxisY,
+    frameT
+  );
 
-  // 4) skos nr 2 – od (skew2Frac * podstawa) do (skew2TargetHFrac * H) na pionie
+  // 4) Skos #2 – oś od (skew2Frac * podstawa) do osi pionu na określonej wysokości
   const s2x0 = baseStartX + dir * (baseLen * Math.max(0, Math.min(1, skew2Frac)));
-  const s2y0 = yOmegaTop;
-  const s2x1 = side === "right" ? outerW : 0;
+  const s2y0 = omegaAxisY;
+  const s2x1 = rightAxisX;
   const s2y1 = outerH * Math.max(0, Math.min(1, skew2TargetHFrac));
   const skew2 = Band(s2x0, s2y0, s2x1, s2y1, frameT);
 
-  // 5) napisy – czysty tekst, klient wpisuje własne wartości
+  // 5) Napisy (poglądowo – klient wpisuje sam wartości)
   const textStyle = {
     paintOrder: "stroke",
     stroke: "#fff",
@@ -110,12 +117,12 @@ export default function TailManual({
         </text>
       )}
       {labels?.vertical && (
-        <text x={mm(side === "right" ? outerW - frameT / 2 : frameT / 2)} y={mm(outerH * 0.15)} fontSize={11} textAnchor="middle" style={textStyle}>
+        <text x={mm(rightAxisX)} y={mm(outerH * 0.15)} fontSize={11} textAnchor="middle" style={textStyle}>
           {labels.vertical}
         </text>
       )}
       {labels?.diagonal && (
-        <text x={mm((baseEndX + topCornerX) / 2)} y={mm((yOmegaTop + topCornerY) / 2) - 6} fontSize={11} textAnchor="middle" style={textStyle}>
+        <text x={mm((rightAxisX + baseEndX) / 2)} y={mm((topAxisY + omegaAxisY) / 2) - 6} fontSize={11} textAnchor="middle" style={textStyle}>
           {labels.diagonal}
         </text>
       )}
