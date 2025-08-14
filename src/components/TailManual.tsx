@@ -3,26 +3,21 @@ import type { CSSProperties } from "react";
 import type { TailManualLabels } from "../types/tail";
 
 export type TailManualProps = {
-  outerW: number;        // szerokość korpusu (mm)
-  outerH: number;        // wysokość korpusu (mm)
-  frameT: number;        // grubość ramy (mm)
-  hA: number;            // wysokość wsporników (A) pod ramą (mm)
-  hP: number;            // wysokość pełnego profilu pod A (mm)
-  hO: number;            // wysokość omegi (mm)
-  scale: number;         // px / mm
+  outerW: number;
+  outerH: number;
+  frameT: number;
+  hA: number;
+  hP: number;
+  hO: number;
+  scale: number;
   side: "left" | "right";
   labels?: TailManualLabels;
 
-  /** Wizualna długość podstawy ogona = visBaseFrac * outerH */
-  visBaseFrac?: number;        // domyślnie 0.8
-  /** Udział długości przedłużenia dolnej ramy (0..1) względem podstawy ogona */
-  bottomExtFrac?: number;      // domyślnie 0.5
-  /** Udział długości przedłużenia omegi (0..1) względem podstawy ogona */
-  omegaExtFrac?: number;       // domyślnie 1 (do czubka ogona)
-  /** Gdzie startuje skos #2 wzdłuż podstawy ogona (0..1) */
-  skew2Frac?: number;          // domyślnie 0.6
-  /** Do jakiej wysokości (ułamkiem outerH) celuje skos #2 przy ramie */
-  skew2TargetHFrac?: number;   // domyślnie 0.5
+  visBaseFrac?: number;        // długość podstawy ogona = frac * outerH
+  bottomExtFrac?: number;      // 0..1 – przedłużenie dolnej ramy
+  omegaExtFrac?: number;       // 0..1 – przedłużenie omegi
+  skew2Frac?: number;          // start skosu #2 po podstawie (0..1)
+  skew2TargetHFrac?: number;   // wysokość celu skosu #2 przy ramie (0..1)
 };
 
 export default function TailManual({
@@ -38,35 +33,37 @@ export default function TailManual({
   const stroke = "#333";
   const dir = side === "right" ? 1 : -1;
 
-  // Minimalne "nadrysowanie" tylko od strony ramy, żeby zniknęły mikro-szczeliny
-  const EPS = 1.75 / Math.max(scale, 1e-6);
+  // overdraw w pikselach (przeliczane na mm)
+  const PX = 1 / Math.max(scale, 1e-6);
+  const EPS_START = 0.25 * PX; // ~0.25 px – delikatnie na początku
+  const EPS_END   = 0.90 * PX; // ~0.9  px – mocniej przy ramie
 
-  // Poziomy referencyjne
-  const yOmegaTop = outerH + hA + hP;  // górna krawędź omegi (pod korpusem)
-  const yBottomTop = outerH - frameT;  // górna krawędź dolnej ramy
+  // poziomy referencyjne
+  const yOmegaTop = outerH + hA + hP;
+  const yBottomTop = outerH - frameT;
   const omegaAxisY = yOmegaTop + hO / 2;
 
-  // Podstawa ogona (wizualnie liczona od krawędzi korpusu)
+  // podstawa ogona
   const baseLen = Math.max(0, outerH * visBaseFrac);
   const baseStartX = side === "right" ? outerW : 0;
   const baseEndX = baseStartX + dir * baseLen;
 
-  // Oś przy ramie + górna rama
+  // oś przy ramie + top frame
   const rightAxisX = side === "right" ? outerW - frameT / 2 : frameT / 2;
   const topAxisY = frameT / 2;
 
-  // Skos #1 (od czubka do górnej ramy przy pionie)
+  // skos #1 (wektor)
   const dx1 = rightAxisX - baseEndX;
   const dy1 = topAxisY - omegaAxisY;
 
-  // Równoległa do skosu #1 przechodząca przez (x0, y0): x - k*y = C (k = dx1/dy1)
+  // równoległa do skosu #1 przechodząca przez (x0, y0)
   const xOnParallelThrough = (x0: number, y0: number, y: number) => {
     const k = Math.abs(dy1) < 1e-9 ? 0 : dx1 / dy1;
     const C = x0 - k * y0;
     return C + k * y;
   };
 
-  // Helper: „pas” o grubości t, z ewentualnym nadrysowaniem na końcu
+  // „pas” o grubości t, z nadrysowaniem na początku/końcu
   const Band = (
     x1: number, y1: number, x2: number, y2: number, t: number,
     startExt = 0, endExt = 0
@@ -89,64 +86,69 @@ export default function TailManual({
     return <polygon points={d} fill={fillFrame} vectorEffect="non-scaling-stroke" />;
   };
 
-  // ========== 1) OMEGA – przedłużenie cięte równoległą do skosu #1 ==========
+  // 1) OMEGA – przedłużenie cięte równoległą do skosu #1
   const omegaAnchorX = baseStartX + dir * (baseLen * clamp01(omegaExtFrac));
   const xCutTopOmega = xOnParallelThrough(omegaAnchorX, omegaAxisY, yOmegaTop);
   const xCutBotOmega = xOnParallelThrough(omegaAnchorX, omegaAxisY, yOmegaTop + hO);
 
-  const omegaExtPointsRight: Array<[number, number]> = [
-    [baseStartX, yOmegaTop],
-    [xCutTopOmega, yOmegaTop],
-    [xCutBotOmega, yOmegaTop + hO],
-    [baseStartX, yOmegaTop + hO],
-  ];
-  const omegaExtPointsLeft: Array<[number, number]> = [
-    [baseStartX, yOmegaTop],
-    [baseStartX, yOmegaTop + hO],
-    [xCutBotOmega, yOmegaTop + hO],
-    [xCutTopOmega, yOmegaTop],
-  ];
-  const omegaExtPts = (side === "right" ? omegaExtPointsRight : omegaExtPointsLeft)
-    .map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ");
+  const omegaExtPts = (side === "right"
+    ? [
+        [baseStartX, yOmegaTop],
+        [xCutTopOmega, yOmegaTop],
+        [xCutBotOmega, yOmegaTop + hO],
+        [baseStartX, yOmegaTop + hO],
+      ]
+    : [
+        [baseStartX, yOmegaTop],
+        [baseStartX, yOmegaTop + hO],
+        [xCutBotOmega, yOmegaTop + hO],
+        [xCutTopOmega, yOmegaTop],
+      ]
+  ).map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ");
 
-  // ========== 2) DOLNA RAMA – przedłużenie liczone po podstawie ogona ==========
+  // 2) DOLNA RAMA – przedłużenie liczone po podstawie ogona
   const baseY = yOmegaTop + hO;
   const anchorBaseX = baseStartX + dir * (baseLen * clamp01(bottomExtFrac));
   const xCutTopBot = xOnParallelThrough(anchorBaseX, baseY, yBottomTop);
   const xCutBotBot = xOnParallelThrough(anchorBaseX, baseY, yBottomTop + frameT);
 
-  const bottomExtPointsRight: Array<[number, number]> = [
-    [baseStartX, yBottomTop],
-    [xCutTopBot, yBottomTop],
-    [xCutBotBot, yBottomTop + frameT],
-    [baseStartX, yBottomTop + frameT],
-  ];
-  const bottomExtPointsLeft: Array<[number, number]> = [
-    [baseStartX, yBottomTop],
-    [baseStartX, yBottomTop + frameT],
-    [xCutBotBot, yBottomTop + frameT],
-    [xCutTopBot, yBottomTop],
-  ];
-  const bottomExtPts = (side === "right" ? bottomExtPointsRight : bottomExtPointsLeft)
-    .map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ");
+  const bottomExtPts = (side === "right"
+    ? [
+        [baseStartX, yBottomTop],
+        [xCutTopBot, yBottomTop],
+        [xCutBotBot, yBottomTop + frameT],
+        [baseStartX, yBottomTop + frameT],
+      ]
+    : [
+        [baseStartX, yBottomTop],
+        [baseStartX, yBottomTop + frameT],
+        [xCutBotBot, yBottomTop + frameT],
+        [xCutTopBot, yBottomTop],
+      ]
+  ).map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ");
 
-  // ========== 3) SKOSY – delikatne nadrysowanie tylko przy ramie ==========
-  // Skos #1: od czubka ogona do górnej ramy
+  // 3) SKOSY – z lekkim overdrawem na obu końcach
   const skew1 = Band(
     baseEndX, omegaAxisY,
     rightAxisX, topAxisY,
     frameT,
-    0, EPS
+    EPS_START,   // nowość
+    EPS_END
   );
 
-  // Skos #2: start gdzieś na podstawie ogona, cel przy ramie ~ na 0.5*outerH
   const s2x0 = baseStartX + dir * (baseLen * clamp01(skew2Frac));
   const s2y0 = omegaAxisY;
   const s2x1 = rightAxisX;
   const s2y1 = outerH * clamp01(skew2TargetHFrac);
-  const skew2 = Band(s2x0, s2y0, s2x1, s2y1, frameT, 0, EPS);
+  const skew2 = Band(
+    s2x0, s2y0,
+    s2x1, s2y1,
+    frameT,
+    EPS_START,   // nowość
+    EPS_END
+  );
 
-  // ========== 4) Etykiety (poglądowe) ==========
+  // 4) Etykiety (poglądowe)
   const textStyle: CSSProperties = {
     paintOrder: "stroke",
     stroke: "#fff",
@@ -229,7 +231,6 @@ export default function TailManual({
   );
 }
 
-/** Użyteczne ograniczenie do [0,1] */
 function clamp01(v: number) {
   if (Number.isNaN(v)) return 0;
   if (v < 0) return 0;
