@@ -1342,6 +1342,14 @@ const [gateBottomEnabled, setGateBottomEnabled] = useState<boolean>(false);
                     showProfileWidths
                     {...bottomGate}
                     {...tailProps}
+                     tailEnabled={tailEnabled}
+  tailSide={tailSide}
+  tailVisBaseFrac={tailVisBaseFrac}
+  tailBottomExtFrac={tailBottomExtFrac}   // <—
+  tailSkew2Frac={tailSkew2Frac}           // <—
+  tailSkew2TargetHFrac={0.5}              // opcjonalnie, np. suwak później
+  tailMode={tailMode}
+  tailManualLabels={tailLabels}
                   />
                 </g>
               )
