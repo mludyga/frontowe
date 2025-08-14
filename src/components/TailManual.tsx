@@ -1,4 +1,3 @@
-// src/components/TailManual.tsx
 import type { TailManualLabels } from "../types/tail";
 
 export type TailManualProps = {
@@ -21,9 +20,9 @@ export type TailManualProps = {
   /** Do jakiej wysokości (ułamkiem outerH) celuje skos #2 przy ramie */
   skew2TargetHFrac?: number;
 
-  /** Dodatkowe przedłużenie omegi poza cięcie (mm) – dodatnie wydłuża w stronę ogona */
+  /** Dodatkowe wydłużenie cięcia omegi w stronę ogona (mm) */
   omegaExtExtraMM?: number;
-  /** Dodatkowe przedłużenie dolnej ramy poza cięcie (mm) – dodatnie wydłuża w stronę ogona */
+  /** Dodatkowe wydłużenie cięcia dolnej ramy w stronę ogona (mm) */
   bottomExtExtraMM?: number;
 };
 
@@ -38,7 +37,6 @@ export default function TailManual({
 }: TailManualProps) {
   const mm = (v: number) => v * scale;
   const fillFrame = "#94a3b8";
-  const stroke = "#333";
   const dir = side === "right" ? 1 : -1;
 
   // lekkie nadrysowanie TYLKO od strony ramy (żeby zniknęły mikro-szczeliny)
@@ -65,8 +63,8 @@ export default function TailManual({
   /**
    * Równoległa do skosu #1: x - k*y = C, k = dx1/dy1 (gdy dy1 ~ 0 => k=0).
    * Zwraca współrzędną X punktu przecięcia z poziomem `y` dla linii
-   * równoległej przechodzącej przez (x0, y0) i dodatkowo przesuniętej o ΔC.
-   * ΔC w praktyce traktujemy jako "dodatkowe mm" w stronę ogona (z uwzględnieniem kierunku).
+   * równoległej przechodzącej przez (x0, y0) i dodatkowo przesuniętej o deltaC.
+   * deltaC traktujemy jako „wydłużenie w mm” w stronę ogona (zależnie od side).
    */
   const xOnParallelThrough = (x0: number, y0: number, y: number, deltaC: number) => {
     const k = Math.abs(dy1) < 1e-9 ? 0 : dx1 / dy1;
@@ -74,7 +72,7 @@ export default function TailManual({
     return C + k * y;
   };
 
-  // helper: „pas” o grubości t, z nadrysowaniem na początku/końcu
+  // helper: „pas” o grubości t, z nadrysowaniem na początku/końcu (bez stroke)
   const Band = (
     x1: number, y1: number, x2: number, y2: number, t: number,
     startExt = 0, endExt = 0
@@ -94,7 +92,7 @@ export default function TailManual({
       [ax - ox, ay - oy],
     ];
     const d = pts.map(([px, py]) => `${mm(px)},${mm(py)}`).join(" ");
-    return <polygon points={d} fill={fillFrame} stroke={stroke} vectorEffect="non-scaling-stroke" />;
+    return <polygon points={d} fill={fillFrame} vectorEffect="non-scaling-stroke" />;
   };
 
   // ===== 1) OMEGA – przedłużenie cięte równoległą do skosu #1 przez koniec ogona, z +mm =====
@@ -140,7 +138,7 @@ export default function TailManual({
   const bottomExtPts = (side === "right" ? bottomExtPointsRight : bottomExtPointsLeft)
     .map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ");
 
-  // ===== 3) SKOSY – overdraw tylko przy ramie =====
+  // ===== 3) SKOSY – overdraw tylko przy ramie (na końcu EPS), bez stroke =====
   const skew1 = Band(
     baseEndX, omegaAxisY,      // czubek ogona
     rightAxisX, topAxisY,      // przy ramie
@@ -155,19 +153,19 @@ export default function TailManual({
   const skew2 = Band(s2x0, s2y0, s2x1, s2y1, frameT, 0, EPS);
 
   // ===== 4) etykiety (opcjonalne) =====
-  const textStyle = {
+  const textStyle: React.CSSProperties = {
     paintOrder: "stroke",
     stroke: "#fff",
     strokeWidth: 3,
     fontVariantNumeric: "tabular-nums",
-  } as any;
+  };
 
   return (
     <g style={{ pointerEvents: "none" }}>
       {/* przedłużenie dolnej ramy */}
-      <polygon points={bottomExtPts} fill={fillFrame} stroke={stroke} vectorEffect="non-scaling-stroke" />
+      <polygon points={bottomExtPts} fill={fillFrame} vectorEffect="non-scaling-stroke" />
       {/* przedłużenie omegi */}
-      <polygon points={omegaExtPts} fill={fillFrame} stroke={stroke} vectorEffect="non-scaling-stroke" />
+      <polygon points={omegaExtPts} fill={fillFrame} vectorEffect="non-scaling-stroke" />
       {/* skosy */}
       {skew1}
       {skew2}
