@@ -25,10 +25,10 @@ export type TailManualProps = {
   skew2TargetHFrac?: number;
 
   /** Naddatek (mm) – o ile WYDŁUŻYĆ trapez omegi poza standardowe cięcie */
-  omegaExtExtraMM?: number;
+  omegaExtExtraMM?: 20;
 
   /** Naddatek (mm) – o ile WYDŁUŻYĆ przedłużenie dolnej ramy */
-  bottomExtExtraMM?: number;
+  bottomExtExtraMM?: 20;
 };
 
 export default function TailManual({
