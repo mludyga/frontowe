@@ -32,12 +32,12 @@ export default function TailManual({
   const fillFrame = "#94a3b8";
   const dir = side === "right" ? 1 : -1;
 
-  // delikatne nadrysowanie aby nie było "białych szparek"
+  // delikatne nadrysowanie tylko dla SKOSÓW (żeby nie było „szparek” przy łączeniach)
   const EPS = 1.75 / Math.max(scale, 1e-6);
 
   // poziomy
   const yOmegaTop = outerH + hA + hP;
-  const yBottomTop = outerH - frameT; // górna krawędź dolnej ramy
+  const yBottomTop = outerH - frameT;       // górna krawędź dolnej ramy
   const omegaAxisY = yOmegaTop + hO / 2;
 
   // podstawa ogona (wizualnie)
@@ -49,22 +49,23 @@ export default function TailManual({
   const rightAxisX = side === "right" ? outerW - frameT / 2 : frameT / 2;
   const topAxisY = frameT / 2;
 
-  // ===== kierunek SKOSU #1 (i normalna) =====
-  // linia przez (baseEndX, omegaAxisY) -> (rightAxisX, topAxisY)
+  // ===== skos #1: wektor + normalna =====
   const dx1 = rightAxisX - baseEndX;
   const dy1 = topAxisY - omegaAxisY;
   const L1 = Math.hypot(dx1, dy1) || 1;
   const ux1 = dx1 / L1, uy1 = dy1 / L1;
-  const nx = -uy1, ny = ux1;               // normalna do skosu #1
-  const nSign = side === "right" ? 1 : -1; // na zewnątrz ogona
-  const cutShiftX = nx * EPS * nSign;
-  const cutShiftY = ny * EPS * nSign;
+  const nx = -uy1, ny = ux1;
+  const nSign = side === "right" ? 1 : -1;
 
-  // równoległa do skosu #1 przechodząca przez x0 na wysokości osi omegi
-  const xOnParallel = (x0: number, y: number) =>
-    x0 + (Math.abs(dy1) < 1e-9 ? 0 : (y - omegaAxisY) * (dx1 / dy1));
+  // Funkcja: x(y) dla linii RÓWNOLEGŁEJ do skosu #1 przechodzącej przez (x0, y0)
+  const xOnParallelThrough = (x0: number, y0: number, y: number) => {
+    const k = Math.abs(dy1) < 1e-9 ? 0 : dx1 / dy1;       // nachylenie w ukł. (x od y)
+    // równanie rodziny: x - k*y = const
+    const C = x0 - k * y0;
+    return C + k * y;
+  };
 
-  // rysuje „pas” (skos) z osobnym rozszerzeniem początku/końca
+  // pomocnik – „pas” o grubości t z osobnym overdraw na początku/końcu
   const Band = (
     x1: number, y1: number, x2: number, y2: number, t: number,
     startExt = 0, endExt = 0
@@ -87,19 +88,18 @@ export default function TailManual({
     return <polygon points={d} fill={fillFrame} vectorEffect="non-scaling-stroke" />;
   };
 
-  // ===== 1) OMEGA – przedłużenie cięte linią skosu #1 przez koniec ogona =====
-  const xCutTopOmega = xOnParallel(baseEndX, yOmegaTop) + cutShiftX;
-  const xCutBotOmega = xOnParallel(baseEndX, yOmegaTop + hO) + cutShiftX;
-  const yCutTopOmega = yOmegaTop + cutShiftY;
-  const yCutBotOmega = yOmegaTop + hO + cutShiftY;
+  // ===== 1) OMEGA – przedłużenie cięte linią równoległą do skosu #1 przez KONIEC ogona =====
+  // (tu zostawiamy drobny overdraw na skosie; omega sama nie ma shiftu – skos to przykryje)
+  const xCutTopOmega = xOnParallelThrough(baseEndX, omegaAxisY, yOmegaTop);
+  const xCutBotOmega = xOnParallelThrough(baseEndX, omegaAxisY, yOmegaTop + hO);
 
   const omegaExt =
     side === "right" ? (
       <polygon
         points={[
           [baseStartX, yOmegaTop],
-          [xCutTopOmega, yCutTopOmega],
-          [xCutBotOmega, yCutBotOmega],
+          [xCutTopOmega, yOmegaTop],
+          [xCutBotOmega, yOmegaTop + hO],
           [baseStartX, yOmegaTop + hO],
         ].map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ")}
         fill={fillFrame}
@@ -110,28 +110,30 @@ export default function TailManual({
         points={[
           [baseStartX, yOmegaTop],
           [baseStartX, yOmegaTop + hO],
-          [xCutBotOmega, yCutBotOmega],
-          [xCutTopOmega, yCutTopOmega],
+          [xCutBotOmega, yOmegaTop + hO],
+          [xCutTopOmega, yOmegaTop],
         ].map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ")}
         fill={fillFrame}
         vectorEffect="non-scaling-stroke"
       />
     );
 
-  // ===== 2) DOLNA RAMA – cięta równoległą do skosu #1 przez punkt zależny od bottomExtFrac =====
-  const anchorX = baseStartX + dir * (baseLen * Math.max(0, Math.min(1, bottomExtFrac)));
-  const xCutTopBot = xOnParallel(anchorX, yBottomTop) + cutShiftX;
-  const xCutBotBot = xOnParallel(anchorX, yBottomTop + frameT) + cutShiftX;
-  const yCutTopBot = yBottomTop + cutShiftY;
-  const yCutBotBot = yBottomTop + frameT + cutShiftY;
+  // ===== 2) DOLNA RAMA – LICZONA po PODSTAWIE OMEGI i BEZ „cutShift” =====
+  // Chcemy 50% (lub bottomExtFrac) długości podstawy ogona liczonej od ramy.
+  const baseY = yOmegaTop + hO; // podstawa omegi
+  const anchorBaseX = baseStartX + dir * (baseLen * Math.max(0, Math.min(1, bottomExtFrac)));
+
+  // Docinamy dolną ramę równoległą do skosu #1 PRZEZ (anchorBaseX, baseY)
+  const xCutTopBot  = xOnParallelThrough(anchorBaseX, baseY, yBottomTop);
+  const xCutBotBot  = xOnParallelThrough(anchorBaseX, baseY, yBottomTop + frameT);
 
   const bottomExt =
     side === "right" ? (
       <polygon
         points={[
           [baseStartX, yBottomTop],
-          [xCutTopBot, yCutTopBot],
-          [xCutBotBot, yCutBotBot],
+          [xCutTopBot, yBottomTop],
+          [xCutBotBot, yBottomTop + frameT],
           [baseStartX, yBottomTop + frameT],
         ].map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ")}
         fill={fillFrame}
@@ -142,18 +144,18 @@ export default function TailManual({
         points={[
           [baseStartX, yBottomTop],
           [baseStartX, yBottomTop + frameT],
-          [xCutBotBot, yCutBotBot],
-          [xCutTopBot, yCutTopBot],
+          [xCutBotBot, yBottomTop + frameT],
+          [xCutTopBot, yBottomTop],
         ].map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ")}
         fill={fillFrame}
         vectorEffect="non-scaling-stroke"
       />
     );
 
-  // ===== 3) Skosy — overdraw tylko od strony RAMY (przy czubku = 0) =====
+  // ===== 3) SKOSY – overdraw tylko OD STRONY RAMY (na czubku = 0) =====
   const skew1 = Band(
-    baseEndX, omegaAxisY,          // start (czubek ogona) – 0
-    rightAxisX, topAxisY,          // koniec przy ramie – EPS
+    baseEndX, omegaAxisY,   // czubek ogona
+    rightAxisX, topAxisY,   // przy ramie
     frameT,
     0, EPS
   );
@@ -164,7 +166,7 @@ export default function TailManual({
   const s2y1 = outerH * Math.max(0, Math.min(1, skew2TargetHFrac));
   const skew2 = Band(s2x0, s2y0, s2x1, s2y1, frameT, 0, EPS);
 
-  // ===== 4) Opcjonalne etykiety =====
+  // ===== 4) (opcjonalne) etykiety =====
   const textStyle = {
     paintOrder: "stroke",
     stroke: "#fff",
