@@ -1,67 +1,72 @@
+// src/components/TailManual.tsx
+import type { CSSProperties } from "react";
 import type { TailManualLabels } from "../types/tail";
 
 export type TailManualProps = {
-  outerW: number;
-  outerH: number;
-  frameT: number;
-  hA: number;
-  hP: number;
-  hO: number;
-  scale: number;
+  outerW: number;        // szerokość korpusu (mm)
+  outerH: number;        // wysokość korpusu (mm)
+  frameT: number;        // grubość ramy (mm)
+  hA: number;            // wysokość wsporników (A) pod ramą (mm)
+  hP: number;            // wysokość pełnego profilu pod A (mm)
+  hO: number;            // wysokość omegi (mm)
+  scale: number;         // px / mm
   side: "left" | "right";
   labels?: TailManualLabels;
 
   /** Wizualna długość podstawy ogona = visBaseFrac * outerH */
-  visBaseFrac?: number;
+  visBaseFrac?: number;        // domyślnie 0.8
   /** Udział długości przedłużenia dolnej ramy (0..1) względem podstawy ogona */
-  bottomExtFrac?: number;
+  bottomExtFrac?: number;      // domyślnie 0.5
+  /** Udział długości przedłużenia omegi (0..1) względem podstawy ogona */
+  omegaExtFrac?: number;       // domyślnie 1 (do czubka ogona)
   /** Gdzie startuje skos #2 wzdłuż podstawy ogona (0..1) */
-  skew2Frac?: number;
+  skew2Frac?: number;          // domyślnie 0.6
   /** Do jakiej wysokości (ułamkiem outerH) celuje skos #2 przy ramie */
-  skew2TargetHFrac?: number;
+  skew2TargetHFrac?: number;   // domyślnie 0.5
 };
 
 export default function TailManual({
   outerW, outerH, frameT, hA, hP, hO, scale, side, labels,
   visBaseFrac = 0.8,
   bottomExtFrac = 0.5,
+  omegaExtFrac = 1,
   skew2Frac = 0.6,
   skew2TargetHFrac = 0.5,
 }: TailManualProps) {
   const mm = (v: number) => v * scale;
   const fillFrame = "#94a3b8";
+  const stroke = "#333";
   const dir = side === "right" ? 1 : -1;
 
-  // lekkie nadrysowanie TYLKO od strony ramy (żeby zniknęły mikro-szczeliny)
+  // Minimalne "nadrysowanie" tylko od strony ramy, żeby zniknęły mikro-szczeliny
   const EPS = 1.75 / Math.max(scale, 1e-6);
 
-  // poziomy
-  const yOmegaTop = outerH + hA + hP;
-  const yBottomTop = outerH - frameT;     // górna krawędź dolnej ramy
+  // Poziomy referencyjne
+  const yOmegaTop = outerH + hA + hP;  // górna krawędź omegi (pod korpusem)
+  const yBottomTop = outerH - frameT;  // górna krawędź dolnej ramy
   const omegaAxisY = yOmegaTop + hO / 2;
 
-  // podstawa ogona (wizualnie)
+  // Podstawa ogona (wizualnie liczona od krawędzi korpusu)
   const baseLen = Math.max(0, outerH * visBaseFrac);
   const baseStartX = side === "right" ? outerW : 0;
   const baseEndX = baseStartX + dir * baseLen;
 
-  // oś przy ramie + górna rama
+  // Oś przy ramie + górna rama
   const rightAxisX = side === "right" ? outerW - frameT / 2 : frameT / 2;
   const topAxisY = frameT / 2;
 
-  // ===== skos #1: kierunek i funkcja równoległej =====
+  // Skos #1 (od czubka do górnej ramy przy pionie)
   const dx1 = rightAxisX - baseEndX;
   const dy1 = topAxisY - omegaAxisY;
 
-  // Równoległa do skosu #1 przechodząca przez (x0,y0):
-  // x - k*y = C, k = dx1/dy1 (gdy dy1~0 => k=0)
+  // Równoległa do skosu #1 przechodząca przez (x0, y0): x - k*y = C (k = dx1/dy1)
   const xOnParallelThrough = (x0: number, y0: number, y: number) => {
     const k = Math.abs(dy1) < 1e-9 ? 0 : dx1 / dy1;
     const C = x0 - k * y0;
     return C + k * y;
   };
 
-  // helper: „pas” o grubości t, z nadrysowaniem na początku/końcu
+  // Helper: „pas” o grubości t, z ewentualnym nadrysowaniem na końcu
   const Band = (
     x1: number, y1: number, x2: number, y2: number, t: number,
     startExt = 0, endExt = 0
@@ -84,9 +89,10 @@ export default function TailManual({
     return <polygon points={d} fill={fillFrame} vectorEffect="non-scaling-stroke" />;
   };
 
-  // ===== 1) OMEGA – przedłużenie cięte równoległą do skosu #1 przez koniec ogona =====
-  const xCutTopOmega = xOnParallelThrough(baseEndX, omegaAxisY, yOmegaTop);
-  const xCutBotOmega = xOnParallelThrough(baseEndX, omegaAxisY, yOmegaTop + hO);
+  // ========== 1) OMEGA – przedłużenie cięte równoległą do skosu #1 ==========
+  const omegaAnchorX = baseStartX + dir * (baseLen * clamp01(omegaExtFrac));
+  const xCutTopOmega = xOnParallelThrough(omegaAnchorX, omegaAxisY, yOmegaTop);
+  const xCutBotOmega = xOnParallelThrough(omegaAnchorX, omegaAxisY, yOmegaTop + hO);
 
   const omegaExtPointsRight: Array<[number, number]> = [
     [baseStartX, yOmegaTop],
@@ -103,10 +109,9 @@ export default function TailManual({
   const omegaExtPts = (side === "right" ? omegaExtPointsRight : omegaExtPointsLeft)
     .map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ");
 
-  // ===== 2) DOLNA RAMA – bez przesunięcia; liczona po podstawie omegi =====
+  // ========== 2) DOLNA RAMA – przedłużenie liczone po podstawie ogona ==========
   const baseY = yOmegaTop + hO;
-  const anchorBaseX = baseStartX + dir * (baseLen * Math.max(0, Math.min(1, bottomExtFrac)));
-
+  const anchorBaseX = baseStartX + dir * (baseLen * clamp01(bottomExtFrac));
   const xCutTopBot = xOnParallelThrough(anchorBaseX, baseY, yBottomTop);
   const xCutBotBot = xOnParallelThrough(anchorBaseX, baseY, yBottomTop + frameT);
 
@@ -125,27 +130,29 @@ export default function TailManual({
   const bottomExtPts = (side === "right" ? bottomExtPointsRight : bottomExtPointsLeft)
     .map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ");
 
-  // ===== 3) SKOSY – overdraw tylko przy ramie =====
+  // ========== 3) SKOSY – delikatne nadrysowanie tylko przy ramie ==========
+  // Skos #1: od czubka ogona do górnej ramy
   const skew1 = Band(
-    baseEndX, omegaAxisY,      // czubek ogona
-    rightAxisX, topAxisY,      // przy ramie
+    baseEndX, omegaAxisY,
+    rightAxisX, topAxisY,
     frameT,
     0, EPS
   );
 
-  const s2x0 = baseStartX + dir * (baseLen * Math.max(0, Math.min(1, skew2Frac)));
+  // Skos #2: start gdzieś na podstawie ogona, cel przy ramie ~ na 0.5*outerH
+  const s2x0 = baseStartX + dir * (baseLen * clamp01(skew2Frac));
   const s2y0 = omegaAxisY;
   const s2x1 = rightAxisX;
-  const s2y1 = outerH * Math.max(0, Math.min(1, skew2TargetHFrac));
+  const s2y1 = outerH * clamp01(skew2TargetHFrac);
   const skew2 = Band(s2x0, s2y0, s2x1, s2y1, frameT, 0, EPS);
 
-  // ===== 4) etykiety (opcjonalne) =====
-  const textStyle: React.CSSProperties = {
+  // ========== 4) Etykiety (poglądowe) ==========
+  const textStyle: CSSProperties = {
     paintOrder: "stroke",
     stroke: "#fff",
     strokeWidth: 3,
     fontVariantNumeric: "tabular-nums",
-  } as unknown as React.CSSProperties;
+  };
 
   return (
     <g style={{ pointerEvents: "none" }}>
@@ -157,7 +164,7 @@ export default function TailManual({
       {skew1}
       {skew2}
 
-      {/* etykiety (jeśli podane) */}
+      {/* (opcjonalne) opisy użytkownika */}
       {labels?.omega && (
         <text
           x={mm(baseStartX + (side === "right" ? 8 : -8))}
@@ -165,6 +172,7 @@ export default function TailManual({
           fontSize={11}
           textAnchor={side === "right" ? "start" : "end"}
           style={textStyle}
+          fill={stroke}
         >
           {labels.omega}
         </text>
@@ -176,6 +184,7 @@ export default function TailManual({
           fontSize={11}
           textAnchor="middle"
           style={textStyle}
+          fill={stroke}
         >
           {labels.base}
         </text>
@@ -187,6 +196,7 @@ export default function TailManual({
           fontSize={11}
           textAnchor="middle"
           style={textStyle}
+          fill={stroke}
         >
           {labels.vertical}
         </text>
@@ -198,6 +208,7 @@ export default function TailManual({
           fontSize={11}
           textAnchor="middle"
           style={textStyle}
+          fill={stroke}
         >
           {labels.diagonal}
         </text>
@@ -209,10 +220,19 @@ export default function TailManual({
           fontSize={11}
           textAnchor="middle"
           style={textStyle}
+          fill={stroke}
         >
           {labels.support}
         </text>
       )}
     </g>
   );
+}
+
+/** Użyteczne ograniczenie do [0,1] */
+function clamp01(v: number) {
+  if (Number.isNaN(v)) return 0;
+  if (v < 0) return 0;
+  if (v > 1) return 1;
+  return v;
 }
