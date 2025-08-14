@@ -1,4 +1,3 @@
-// src/components/TailManual.tsx
 import type { CSSProperties } from "react";
 import type { TailManualLabels } from "../types/tail";
 
@@ -13,32 +12,44 @@ export type TailManualProps = {
   side: "left" | "right";
   labels?: TailManualLabels;
 
-  visBaseFrac?: number;        // długość podstawy ogona = frac * outerH
-  bottomExtFrac?: number;      // 0..1 – przedłużenie dolnej ramy
-  omegaExtFrac?: number;       // 0..1 – przedłużenie omegi
-  skew2Frac?: number;          // start skosu #2 po podstawie (0..1)
-  skew2TargetHFrac?: number;   // wysokość celu skosu #2 przy ramie (0..1)
+  /** Wizualna długość podstawy ogona = visBaseFrac * outerH */
+  visBaseFrac?: number;
+
+  /** Udział długości przedłużenia dolnej ramy względem podstawy ogona (0..1) */
+  bottomExtFrac?: number;
+
+  /** Gdzie startuje skos #2 wzdłuż podstawy ogona (0..1) */
+  skew2Frac?: number;
+
+  /** Do jakiej wysokości (ułamkiem outerH) celuje skos #2 przy ramie (0..1) */
+  skew2TargetHFrac?: number;
+
+  /** Naddatek (mm) – o ile WYDŁUŻYĆ trapez omegi poza standardowe cięcie */
+  omegaExtExtraMM?: number;
+
+  /** Naddatek (mm) – o ile WYDŁUŻYĆ przedłużenie dolnej ramy */
+  bottomExtExtraMM?: number;
 };
 
 export default function TailManual({
   outerW, outerH, frameT, hA, hP, hO, scale, side, labels,
   visBaseFrac = 0.8,
   bottomExtFrac = 0.5,
-  omegaExtFrac = 1,
   skew2Frac = 0.6,
   skew2TargetHFrac = 0.5,
+  omegaExtExtraMM = 12,      // <— TUTAJ regulujesz długość omegi (mm)
+  bottomExtExtraMM = 12,     // <— TUTAJ regulujesz długość dolnej ramy (mm)
 }: TailManualProps) {
   const mm = (v: number) => v * scale;
   const fillFrame = "#94a3b8";
-  const stroke = "#333";
   const dir = side === "right" ? 1 : -1;
 
-  // overdraw w pikselach (przeliczane na mm)
+  // overdraw (w px) zamieniony na mm – żeby domknąć styk skosów
   const PX = 1 / Math.max(scale, 1e-6);
-  const EPS_START = 0.25 * PX; // ~0.25 px – delikatnie na początku
-  const EPS_END   = 0.90 * PX; // ~0.9  px – mocniej przy ramie
+  const EPS_START = 0.25 * PX; // delikatnie na początku
+  const EPS_END   = 0.90 * PX; // mocniej przy ramie
 
-  // poziomy referencyjne
+  // poziomy odniesienia
   const yOmegaTop = outerH + hA + hP;
   const yBottomTop = outerH - frameT;
   const omegaAxisY = yOmegaTop + hO / 2;
@@ -48,22 +59,25 @@ export default function TailManual({
   const baseStartX = side === "right" ? outerW : 0;
   const baseEndX = baseStartX + dir * baseLen;
 
-  // oś przy ramie + top frame
+  // oś przy ramie + górna rama
   const rightAxisX = side === "right" ? outerW - frameT / 2 : frameT / 2;
   const topAxisY = frameT / 2;
 
-  // skos #1 (wektor)
+  // wektor skosu #1 (od czubka ogona do ramy)
   const dx1 = rightAxisX - baseEndX;
   const dy1 = topAxisY - omegaAxisY;
+  const L1 = Math.hypot(dx1, dy1) || 1;
+  const ux1 = dx1 / L1;
+  const uy1 = dy1 / L1;
 
-  // równoległa do skosu #1 przechodząca przez (x0, y0)
+  // równoległa do skosu #1 przechodząca przez (x0, y0) => x - k*y = C
   const xOnParallelThrough = (x0: number, y0: number, y: number) => {
     const k = Math.abs(dy1) < 1e-9 ? 0 : dx1 / dy1;
     const C = x0 - k * y0;
     return C + k * y;
   };
 
-  // „pas” o grubości t, z nadrysowaniem na początku/końcu
+  // helper: „pas” o grubości t (bez stroke), z nadrysowaniem na końcach
   const Band = (
     x1: number, y1: number, x2: number, y2: number, t: number,
     startExt = 0, endExt = 0
@@ -86,10 +100,13 @@ export default function TailManual({
     return <polygon points={d} fill={fillFrame} vectorEffect="non-scaling-stroke" />;
   };
 
-  // 1) OMEGA – przedłużenie cięte równoległą do skosu #1
-  const omegaAnchorX = baseStartX + dir * (baseLen * clamp01(omegaExtFrac));
-  const xCutTopOmega = xOnParallelThrough(omegaAnchorX, omegaAxisY, yOmegaTop);
-  const xCutBotOmega = xOnParallelThrough(omegaAnchorX, omegaAxisY, yOmegaTop + hO);
+  // ===== 1) OMEGA – trapez z naddatkiem wzdłuż kierunku skosu #1 =====
+  // bazowo tniemy równoległą przez (baseEndX, omegaAxisY); żeby wydłużyć,
+  // przesuwamy punkt „przez który prowadzimy” O W D O Ł kwestii skosu #1.
+  const omegaShiftX = -ux1 * omegaExtExtraMM;
+  const omegaShiftY = -uy1 * omegaExtExtraMM;
+  const xCutTopOmega = xOnParallelThrough(baseEndX + omegaShiftX, omegaAxisY + omegaShiftY, yOmegaTop);
+  const xCutBotOmega = xOnParallelThrough(baseEndX + omegaShiftX, omegaAxisY + omegaShiftY, yOmegaTop + hO);
 
   const omegaExtPts = (side === "right"
     ? [
@@ -106,11 +123,11 @@ export default function TailManual({
       ]
   ).map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ");
 
-  // 2) DOLNA RAMA – przedłużenie liczone po podstawie ogona
+  // ===== 2) DOLNA RAMA – przedłużenie z naddatkiem w tym samym kierunku =====
   const baseY = yOmegaTop + hO;
   const anchorBaseX = baseStartX + dir * (baseLen * clamp01(bottomExtFrac));
-  const xCutTopBot = xOnParallelThrough(anchorBaseX, baseY, yBottomTop);
-  const xCutBotBot = xOnParallelThrough(anchorBaseX, baseY, yBottomTop + frameT);
+  const xCutTopBot = xOnParallelThrough(anchorBaseX - ux1 * bottomExtExtraMM, baseY - uy1 * bottomExtExtraMM, yBottomTop);
+  const xCutBotBot = xOnParallelThrough(anchorBaseX - ux1 * bottomExtExtraMM, baseY - uy1 * bottomExtExtraMM, yBottomTop + frameT);
 
   const bottomExtPts = (side === "right"
     ? [
@@ -127,13 +144,12 @@ export default function TailManual({
       ]
   ).map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ");
 
-  // 3) SKOSY – z lekkim overdrawem na obu końcach
+  // ===== 3) SKOSY – z lekkim overdrawem na obu końcach =====
   const skew1 = Band(
     baseEndX, omegaAxisY,
     rightAxisX, topAxisY,
     frameT,
-    EPS_START,   // nowość
-    EPS_END
+    EPS_START, EPS_END
   );
 
   const s2x0 = baseStartX + dir * (baseLen * clamp01(skew2Frac));
@@ -144,11 +160,10 @@ export default function TailManual({
     s2x0, s2y0,
     s2x1, s2y1,
     frameT,
-    EPS_START,   // nowość
-    EPS_END
+    EPS_START, EPS_END
   );
 
-  // 4) Etykiety (poglądowe)
+  // ===== 4) Etykiety (opcjonalne, wpisywane ręcznie przez klienta) =====
   const textStyle: CSSProperties = {
     paintOrder: "stroke",
     stroke: "#fff",
@@ -166,7 +181,7 @@ export default function TailManual({
       {skew1}
       {skew2}
 
-      {/* (opcjonalne) opisy użytkownika */}
+      {/* etykiety (jeśli podane) */}
       {labels?.omega && (
         <text
           x={mm(baseStartX + (side === "right" ? 8 : -8))}
@@ -174,7 +189,6 @@ export default function TailManual({
           fontSize={11}
           textAnchor={side === "right" ? "start" : "end"}
           style={textStyle}
-          fill={stroke}
         >
           {labels.omega}
         </text>
@@ -186,7 +200,6 @@ export default function TailManual({
           fontSize={11}
           textAnchor="middle"
           style={textStyle}
-          fill={stroke}
         >
           {labels.base}
         </text>
@@ -198,7 +211,6 @@ export default function TailManual({
           fontSize={11}
           textAnchor="middle"
           style={textStyle}
-          fill={stroke}
         >
           {labels.vertical}
         </text>
@@ -210,7 +222,6 @@ export default function TailManual({
           fontSize={11}
           textAnchor="middle"
           style={textStyle}
-          fill={stroke}
         >
           {labels.diagonal}
         </text>
@@ -222,7 +233,6 @@ export default function TailManual({
           fontSize={11}
           textAnchor="middle"
           style={textStyle}
-          fill={stroke}
         >
           {labels.support}
         </text>
