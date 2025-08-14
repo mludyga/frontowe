@@ -4,18 +4,18 @@ import type { TailManualLabels } from "../types/tail";
 export type TailManualProps = {
   outerW: number;
   outerH: number;
-  frameT: number;    // grubość ramy
-  hA: number;        // wysokość wsporników (A)
-  hP: number;        // wysokość profilu pełnego
-  hO: number;        // wysokość Omegi (i grubość jej przedłużenia)
+  frameT: number;
+  hA: number;
+  hP: number;
+  hO: number;
   scale: number;
   side: "left" | "right";
   labels?: TailManualLabels;
 
-  visBaseFrac?: number;       // długość podstawy jako ułamek H korpusu (domyślnie 0.8)
-  bottomExtFrac?: number;     // przedłużenie dolnej ramy [% podstawy] (domyślnie 0.5)
-  skew2Frac?: number;         // start skosu #2 na podstawie (0..1, domyślnie 0.6)
-  skew2TargetHFrac?: number;  // wysokość końca skosu #2 na pionie (0..1, domyślnie 0.5)
+  visBaseFrac?: number;
+  bottomExtFrac?: number;
+  skew2Frac?: number;
+  skew2TargetHFrac?: number;
 };
 
 export default function TailManual({
@@ -29,29 +29,29 @@ export default function TailManual({
   const fillFrame = "#94a3b8";
   const dir = side === "right" ? 1 : -1;
 
-  // ~1 px w mm (zależne od skali) – małe „overdraw”, żeby nic nie prześwitywało
-  const EPS = 1 / Math.max(scale, 1e-6);
+  // odrobina "overdraw", żeby absolutnie nic nie prześwitywało
+  const EPS = 1.75 / Math.max(scale, 1e-6);
 
-  // Referencje geometryczne
-  const yOmegaTop = outerH + hA + hP;           // górna krawędź Omegi
-  const yBottomFrameTop = outerH - frameT;      // górna krawędź dolnej ramy
+  // poziomy
+  const yOmegaTop = outerH + hA + hP;
+  const yBottomTop = outerH - frameT;
+
+  // podstawa ogona (wizualnie)
   const baseLen = Math.max(0, outerH * visBaseFrac);
   const baseStartX = side === "right" ? outerW : 0;
   const baseEndX = baseStartX + dir * baseLen;
 
-  // Osiowo rysujemy pasy – dzięki temu wszystkie grubości idealnie się kleją
-  const omegaAxisY = yOmegaTop + hO / 2;
-  const rightAxisX = side === "right" ? outerW - frameT / 2 : frameT / 2; // oś pionu
-  const topAxisY = frameT / 2;                                            // oś górnej ramy
+  // oś pionu po stronie ogona i oś górnej ramy
+  const rightAxisX = side === "right" ? outerW - frameT / 2 : frameT / 2;
+  const topAxisY = frameT / 2;
 
-  // Pas o grubości t między P1 i P2, przedłużony na końcach o ext (mm).
+  // pomocnicza funkcja rysowania "pasów"
   const Band = (x1: number, y1: number, x2: number, y2: number, t: number, ext = 0) => {
     const dx = x2 - x1, dy = y2 - y1;
     const L = Math.hypot(dx, dy) || 1;
     const ux = dx / L, uy = dy / L;
     const ox = -uy * (t / 2), oy = ux * (t / 2);
 
-    // przedłużenie końców o 'ext'
     const ax = x1 - ux * ext, ay = y1 - uy * ext;
     const bx = x2 + ux * ext, by = y2 + uy * ext;
 
@@ -65,86 +65,98 @@ export default function TailManual({
     return <polygon points={d} fill={fillFrame} vectorEffect="non-scaling-stroke" />;
   };
 
-  // ---- 1) OMEGA – przedłużenie z fazą równoległą do skosu #1, z lekkim offsetem ----
-  // Skos #1 (oś): (baseEndX, omegaAxisY) -> (rightAxisX, topAxisY)
+  // ===== skos #1 – kierunek/cięcie =====
+  // Oś skosu #1: (baseEndX, yOmegaTop + hO/2) -> (rightAxisX, topAxisY)
+  const omegaAxisY = yOmegaTop + hO / 2;
   const dx1 = rightAxisX - baseEndX;
   const dy1 = topAxisY - omegaAxisY;
-
-  // kierunek skosu #1 (unit) i jego normalna (unit)
   const L1 = Math.hypot(dx1, dy1) || 1;
   const ux1 = dx1 / L1, uy1 = dy1 / L1;
-  // normalna „na zewnątrz” – kierunek w stronę czubka (dla right: +x)
+  // normalna i przesunięcie cięcia "na zewnątrz"
   const nx = -uy1, ny = ux1;
-  const nSign = side === "right" ? 1 : -1; // przesuwamy w stronę czubka
+  const nSign = side === "right" ? 1 : -1;
   const cutShiftX = nx * EPS * nSign;
   const cutShiftY = ny * EPS * nSign;
 
-  // równoległa do skosu #1, przechodząca przez (baseEndX, omegaAxisY)
+  // równoległa do skosu #1: x(y)
   const xOnCut = (y: number) =>
-    baseEndX + (dy1 === 0 ? 0 : (y - omegaAxisY) * (dx1 / dy1));
+    baseEndX + (Math.abs(dy1) < 1e-9 ? 0 : (y - omegaAxisY) * (dx1 / dy1));
 
-  // punkty wielokąta omegi (z przesunięciem linii cięcia o EPS „na zewnątrz”)
-  const y0 = yOmegaTop;
-  const y1 = yOmegaTop + hO;
-  const xCutTop = xOnCut(y0) + cutShiftX;
-  const xCutBot = xOnCut(y1) + cutShiftX;
-  const yCutTop = y0 + cutShiftY;
-  const yCutBot = y1 + cutShiftY;
+  // ===== 1) OMEGA – przedłużenie z ukosem =====
+  {
+    const y0 = yOmegaTop, y1 = yOmegaTop + hO;
+    const xCutTop = xOnCut(y0) + cutShiftX;
+    const xCutBot = xOnCut(y1) + cutShiftX;
+    const yCutTop = y0 + cutShiftY;
+    const yCutBot = y1 + cutShiftY;
 
-  const omegaPolyPoints =
-    side === "right"
-      ? [
-          [baseStartX, y0],
-          [xCutTop,    yCutTop],
-          [xCutBot,    yCutBot],
-          [baseStartX, y1],
-        ]
-      : [
-          [baseStartX, y0],
-          [baseStartX, y1],
-          [xCutBot,    yCutBot],
-          [xCutTop,    yCutTop],
-        ];
+    const pts =
+      side === "right"
+        ? [
+            [baseStartX, y0],
+            [xCutTop,    yCutTop],
+            [xCutBot,    yCutBot],
+            [baseStartX, y1],
+          ]
+        : [
+            [baseStartX, y0],
+            [baseStartX, y1],
+            [xCutBot,    yCutBot],
+            [xCutTop,    yCutTop],
+          ];
 
-  const omegaExt = (
-    <polygon
-      points={omegaPolyPoints.map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ")}
-      fill={fillFrame}
-      vectorEffect="non-scaling-stroke"
-    />
-  );
+    // rysuj
+    const p = pts.map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ");
+    // @ts-ignore - zwracamy w <g> na końcu
+    var omegaExt = <polygon points={p} fill={fillFrame} vectorEffect="non-scaling-stroke" />;
+  }
 
-  // ---- 2) Przedłużenie dolnej ramy – minimalnie dłuższe o EPS w stronę czubka ----
-  const botExtLen = baseLen * Math.max(0, Math.min(1, bottomExtFrac));
-  const botX0 = Math.min(baseStartX, baseStartX + dir * botExtLen) - (dir < 0 ? EPS : 0);
-  const botW  = Math.abs(botExtLen) + EPS; // +EPS w stronę czubka
-  const bottomExt = (
-    <rect
-      x={mm(botX0)}
-      y={mm(yBottomFrameTop)}
-      width={mm(botW)}
-      height={mm(frameT)}
-      fill={fillFrame}
-      vectorEffect="non-scaling-stroke"
-    />
-  );
+  // ===== 2) DOLNA RAMA – przedłużenie z tym samym ukosem (zamiast płaskiego końca) =====
+  {
+    const extLen = baseLen * Math.max(0, Math.min(1, bottomExtFrac));
+    const xFlatEnd = baseStartX + dir * extLen;
 
-  // ---- 3) Skosy – pasy osiowe, przedłużone na końcach o EPS ----
+    // tniemy ten "prostokąt" linią równoległą do skosu #1
+    const yTop = yBottomTop, yBot = yBottomTop + frameT;
+    const xCutTop = xOnCut(yTop) + cutShiftX;
+    const xCutBot = xOnCut(yBot) + cutShiftX;
+    const yCutTop = yTop + cutShiftY;
+    const yCutBot = yBot + cutShiftY;
+
+    const pts =
+      side === "right"
+        ? [
+            [baseStartX, yTop],
+            [xCutTop,    yCutTop],
+            [xCutBot,    yCutBot],
+            [baseStartX, yBot],
+          ]
+        : [
+            [baseStartX, yTop],
+            [baseStartX, yBot],
+            [xCutBot,    yCutBot],
+            [xCutTop,    yCutTop],
+          ];
+
+    const p = pts.map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ");
+    // @ts-ignore
+    var bottomExt = <polygon points={p} fill={fillFrame} vectorEffect="non-scaling-stroke" />;
+  }
+
+  // ===== 3) Skosy (pasy z "overdraw" na końcach) =====
   const skew1 = Band(
-    baseEndX,   omegaAxisY,
+    baseEndX, omegaAxisY,
     rightAxisX, topAxisY,
-    frameT,
-    EPS
+    frameT, EPS
   );
 
   const s2x0 = baseStartX + dir * (baseLen * Math.max(0, Math.min(1, skew2Frac)));
   const s2y0 = omegaAxisY;
   const s2x1 = rightAxisX;
   const s2y1 = outerH * Math.max(0, Math.min(1, skew2TargetHFrac));
-
   const skew2 = Band(s2x0, s2y0, s2x1, s2y1, frameT, EPS);
 
-  // ---- 4) Etykiety (opcjonalnie, pogląd) ----
+  // ===== 4) Etykiety (opcjonalnie) =====
   const textStyle = {
     paintOrder: "stroke",
     stroke: "#fff",
@@ -152,40 +164,44 @@ export default function TailManual({
     fontVariantNumeric: "tabular-nums",
   } as const;
 
-  const txtAnchor = side === "right" ? "start" : "end";
-  const txtX = side === "right" ? baseStartX + 8 : baseStartX - 8;
-
   const labelsG = (
     <g>
       {labels?.omega && (
-        <text x={mm(txtX)} y={mm(yOmegaTop + hO) - 6} fontSize={11} textAnchor={txtAnchor} style={textStyle}>
+        <text x={mm(baseStartX + (side === "right" ? 8 : -8))}
+              y={mm(yOmegaTop + hO) - 6}
+              fontSize={11}
+              textAnchor={side === "right" ? "start" : "end"}
+              style={textStyle}>
           {labels.omega}
         </text>
       )}
       {labels?.base && (
-        <text x={mm((baseStartX + baseEndX) / 2)} y={mm(yOmegaTop) - 6} fontSize={11} textAnchor="middle" style={textStyle}>
+        <text x={mm((baseStartX + baseEndX) / 2)} y={mm(yOmegaTop) - 6}
+              fontSize={11} textAnchor="middle" style={textStyle}>
           {labels.base}
         </text>
       )}
       {labels?.vertical && (
-        <text x={mm(rightAxisX)} y={mm(outerH * 0.15)} fontSize={11} textAnchor="middle" style={textStyle}>
+        <text x={mm(rightAxisX)} y={mm(outerH * 0.15)}
+              fontSize={11} textAnchor="middle" style={textStyle}>
           {labels.vertical}
         </text>
       )}
       {labels?.diagonal && (
-        <text x={mm((rightAxisX + baseEndX) / 2)} y={mm((topAxisY + omegaAxisY) / 2) - 6} fontSize={11} textAnchor="middle" style={textStyle}>
+        <text x={mm((rightAxisX + baseEndX) / 2)} y={mm((topAxisY + omegaAxisY) / 2) - 6}
+              fontSize={11} textAnchor="middle" style={textStyle}>
           {labels.diagonal}
         </text>
       )}
       {labels?.support && (
-        <text x={mm((baseStartX + baseStartX + dir * botExtLen) / 2)} y={mm(yBottomFrameTop) - 6} fontSize={11} textAnchor="middle" style={textStyle}>
+        <text x={mm((baseStartX + baseEndX) / 2)} y={mm(yBottomTop) - 6}
+              fontSize={11} textAnchor="middle" style={textStyle}>
           {labels.support}
         </text>
       )}
     </g>
   );
 
-  // kolejność rysowania: najpierw podstawa/omega, potem skosy (z EPS), na końcu etykiety
   return (
     <g style={{ pointerEvents: "none" }}>
       {bottomExt}
