@@ -49,23 +49,19 @@ export default function TailManual({
   const rightAxisX = side === "right" ? outerW - frameT / 2 : frameT / 2;
   const topAxisY = frameT / 2;
 
-  // ===== skos #1: wektor + normalna =====
+  // ===== skos #1: wektor + funkcja „równoległej” =====
   const dx1 = rightAxisX - baseEndX;
   const dy1 = topAxisY - omegaAxisY;
-  const L1 = Math.hypot(dx1, dy1) || 1;
-  const ux1 = dx1 / L1, uy1 = dy1 / L1;
-  const nx = -uy1, ny = ux1;
-  const nSign = side === "right" ? 1 : -1;
 
-  // Funkcja: x(y) dla linii RÓWNOLEGŁEJ do skosu #1 przechodzącej przez (x0, y0)
+  // Równanie linii równoległej do skosu #1 przechodzącej przez (x0,y0):
+  // zapisane w postaci x - k*y = C, gdzie k = dx1/dy1 (jeśli dy1≈0, przyjmujemy k=0).
   const xOnParallelThrough = (x0: number, y0: number, y: number) => {
-    const k = Math.abs(dy1) < 1e-9 ? 0 : dx1 / dy1;       // nachylenie w ukł. (x od y)
-    // równanie rodziny: x - k*y = const
+    const k = Math.abs(dy1) < 1e-9 ? 0 : dx1 / dy1;
     const C = x0 - k * y0;
     return C + k * y;
   };
 
-  // pomocnik – „pas” o grubości t z osobnym overdraw na początku/końcu
+  // pomocnik – „pas” o grubości t z nadrysowaniem na początku/końcu
   const Band = (
     x1: number, y1: number, x2: number, y2: number, t: number,
     startExt = 0, endExt = 0
@@ -89,7 +85,6 @@ export default function TailManual({
   };
 
   // ===== 1) OMEGA – przedłużenie cięte linią równoległą do skosu #1 przez KONIEC ogona =====
-  // (tu zostawiamy drobny overdraw na skosie; omega sama nie ma shiftu – skos to przykryje)
   const xCutTopOmega = xOnParallelThrough(baseEndX, omegaAxisY, yOmegaTop);
   const xCutBotOmega = xOnParallelThrough(baseEndX, omegaAxisY, yOmegaTop + hO);
 
@@ -119,11 +114,9 @@ export default function TailManual({
     );
 
   // ===== 2) DOLNA RAMA – LICZONA po PODSTAWIE OMEGI i BEZ „cutShift” =====
-  // Chcemy 50% (lub bottomExtFrac) długości podstawy ogona liczonej od ramy.
   const baseY = yOmegaTop + hO; // podstawa omegi
   const anchorBaseX = baseStartX + dir * (baseLen * Math.max(0, Math.min(1, bottomExtFrac)));
 
-  // Docinamy dolną ramę równoległą do skosu #1 PRZEZ (anchorBaseX, baseY)
   const xCutTopBot  = xOnParallelThrough(anchorBaseX, baseY, yBottomTop);
   const xCutBotBot  = xOnParallelThrough(anchorBaseX, baseY, yBottomTop + frameT);
 
@@ -192,7 +185,7 @@ export default function TailManual({
         </text>
       )}
       {labels?.vertical && (
-        <text x={mm(rightAxisX)} y={mm(outerH * 0.15)}
+        <text x={mm(rightAxisX)} y={mm(outerH * 0.15))}
               fontSize={11} textAnchor="middle" style={textStyle}>
           {labels.vertical}
         </text>
