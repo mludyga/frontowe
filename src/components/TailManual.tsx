@@ -32,12 +32,12 @@ export default function TailManual({
   const fillFrame = "#94a3b8";
   const dir = side === "right" ? 1 : -1;
 
-  // delikatne nadrysowanie tylko dla SKOSÓW (żeby nie było „szparek” przy łączeniach)
+  // lekkie nadrysowanie TYLKO od strony ramy (żeby zniknęły mikro-szczeliny)
   const EPS = 1.75 / Math.max(scale, 1e-6);
 
   // poziomy
   const yOmegaTop = outerH + hA + hP;
-  const yBottomTop = outerH - frameT;       // górna krawędź dolnej ramy
+  const yBottomTop = outerH - frameT;     // górna krawędź dolnej ramy
   const omegaAxisY = yOmegaTop + hO / 2;
 
   // podstawa ogona (wizualnie)
@@ -45,23 +45,23 @@ export default function TailManual({
   const baseStartX = side === "right" ? outerW : 0;
   const baseEndX = baseStartX + dir * baseLen;
 
-  // oś pionu przy ramie i górna rama
+  // oś przy ramie + górna rama
   const rightAxisX = side === "right" ? outerW - frameT / 2 : frameT / 2;
   const topAxisY = frameT / 2;
 
-  // ===== skos #1: wektor + funkcja „równoległej” =====
+  // ===== skos #1: kierunek i funkcja równoległej =====
   const dx1 = rightAxisX - baseEndX;
   const dy1 = topAxisY - omegaAxisY;
 
-  // Równanie linii równoległej do skosu #1 przechodzącej przez (x0,y0):
-  // zapisane w postaci x - k*y = C, gdzie k = dx1/dy1 (jeśli dy1≈0, przyjmujemy k=0).
+  // Równoległa do skosu #1 przechodząca przez (x0,y0):
+  // x - k*y = C, k = dx1/dy1 (gdy dy1~0 => k=0)
   const xOnParallelThrough = (x0: number, y0: number, y: number) => {
     const k = Math.abs(dy1) < 1e-9 ? 0 : dx1 / dy1;
     const C = x0 - k * y0;
     return C + k * y;
   };
 
-  // pomocnik – „pas” o grubości t z nadrysowaniem na początku/końcu
+  // helper: „pas” o grubości t, z nadrysowaniem na początku/końcu
   const Band = (
     x1: number, y1: number, x2: number, y2: number, t: number,
     startExt = 0, endExt = 0
@@ -84,71 +84,51 @@ export default function TailManual({
     return <polygon points={d} fill={fillFrame} vectorEffect="non-scaling-stroke" />;
   };
 
-  // ===== 1) OMEGA – przedłużenie cięte linią równoległą do skosu #1 przez KONIEC ogona =====
+  // ===== 1) OMEGA – przedłużenie cięte równoległą do skosu #1 przez koniec ogona =====
   const xCutTopOmega = xOnParallelThrough(baseEndX, omegaAxisY, yOmegaTop);
   const xCutBotOmega = xOnParallelThrough(baseEndX, omegaAxisY, yOmegaTop + hO);
 
-  const omegaExt =
-    side === "right" ? (
-      <polygon
-        points={[
-          [baseStartX, yOmegaTop],
-          [xCutTopOmega, yOmegaTop],
-          [xCutBotOmega, yOmegaTop + hO],
-          [baseStartX, yOmegaTop + hO],
-        ].map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ")}
-        fill={fillFrame}
-        vectorEffect="non-scaling-stroke"
-      />
-    ) : (
-      <polygon
-        points={[
-          [baseStartX, yOmegaTop],
-          [baseStartX, yOmegaTop + hO],
-          [xCutBotOmega, yOmegaTop + hO],
-          [xCutTopOmega, yOmegaTop],
-        ].map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ")}
-        fill={fillFrame}
-        vectorEffect="non-scaling-stroke"
-      />
-    );
+  const omegaExtPointsRight: Array<[number, number]> = [
+    [baseStartX, yOmegaTop],
+    [xCutTopOmega, yOmegaTop],
+    [xCutBotOmega, yOmegaTop + hO],
+    [baseStartX, yOmegaTop + hO],
+  ];
+  const omegaExtPointsLeft: Array<[number, number]> = [
+    [baseStartX, yOmegaTop],
+    [baseStartX, yOmegaTop + hO],
+    [xCutBotOmega, yOmegaTop + hO],
+    [xCutTopOmega, yOmegaTop],
+  ];
+  const omegaExtPts = (side === "right" ? omegaExtPointsRight : omegaExtPointsLeft)
+    .map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ");
 
-  // ===== 2) DOLNA RAMA – LICZONA po PODSTAWIE OMEGI i BEZ „cutShift” =====
-  const baseY = yOmegaTop + hO; // podstawa omegi
+  // ===== 2) DOLNA RAMA – bez przesunięcia; liczona po podstawie omegi =====
+  const baseY = yOmegaTop + hO;
   const anchorBaseX = baseStartX + dir * (baseLen * Math.max(0, Math.min(1, bottomExtFrac)));
 
-  const xCutTopBot  = xOnParallelThrough(anchorBaseX, baseY, yBottomTop);
-  const xCutBotBot  = xOnParallelThrough(anchorBaseX, baseY, yBottomTop + frameT);
+  const xCutTopBot = xOnParallelThrough(anchorBaseX, baseY, yBottomTop);
+  const xCutBotBot = xOnParallelThrough(anchorBaseX, baseY, yBottomTop + frameT);
 
-  const bottomExt =
-    side === "right" ? (
-      <polygon
-        points={[
-          [baseStartX, yBottomTop],
-          [xCutTopBot, yBottomTop],
-          [xCutBotBot, yBottomTop + frameT],
-          [baseStartX, yBottomTop + frameT],
-        ].map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ")}
-        fill={fillFrame}
-        vectorEffect="non-scaling-stroke"
-      />
-    ) : (
-      <polygon
-        points={[
-          [baseStartX, yBottomTop],
-          [baseStartX, yBottomTop + frameT],
-          [xCutBotBot, yBottomTop + frameT],
-          [xCutTopBot, yBottomTop],
-        ].map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ")}
-        fill={fillFrame}
-        vectorEffect="non-scaling-stroke"
-      />
-    );
+  const bottomExtPointsRight: Array<[number, number]> = [
+    [baseStartX, yBottomTop],
+    [xCutTopBot, yBottomTop],
+    [xCutBotBot, yBottomTop + frameT],
+    [baseStartX, yBottomTop + frameT],
+  ];
+  const bottomExtPointsLeft: Array<[number, number]> = [
+    [baseStartX, yBottomTop],
+    [baseStartX, yBottomTop + frameT],
+    [xCutBotBot, yBottomTop + frameT],
+    [xCutTopBot, yBottomTop],
+  ];
+  const bottomExtPts = (side === "right" ? bottomExtPointsRight : bottomExtPointsLeft)
+    .map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ");
 
-  // ===== 3) SKOSY – overdraw tylko OD STRONY RAMY (na czubku = 0) =====
+  // ===== 3) SKOSY – overdraw tylko przy ramie =====
   const skew1 = Band(
-    baseEndX, omegaAxisY,   // czubek ogona
-    rightAxisX, topAxisY,   // przy ramie
+    baseEndX, omegaAxisY,      // czubek ogona
+    rightAxisX, topAxisY,      // przy ramie
     frameT,
     0, EPS
   );
@@ -159,59 +139,80 @@ export default function TailManual({
   const s2y1 = outerH * Math.max(0, Math.min(1, skew2TargetHFrac));
   const skew2 = Band(s2x0, s2y0, s2x1, s2y1, frameT, 0, EPS);
 
-  // ===== 4) (opcjonalne) etykiety =====
-  const textStyle = {
+  // ===== 4) etykiety (opcjonalne) =====
+  const textStyle: React.CSSProperties = {
     paintOrder: "stroke",
     stroke: "#fff",
     strokeWidth: 3,
     fontVariantNumeric: "tabular-nums",
-  } as const;
+  } as unknown as React.CSSProperties;
 
-  const labelsG = (
-    <g>
+  return (
+    <g style={{ pointerEvents: "none" }}>
+      {/* przedłużenie dolnej ramy */}
+      <polygon points={bottomExtPts} fill={fillFrame} vectorEffect="non-scaling-stroke" />
+      {/* przedłużenie omegi */}
+      <polygon points={omegaExtPts} fill={fillFrame} vectorEffect="non-scaling-stroke" />
+      {/* skosy */}
+      {skew1}
+      {skew2}
+
+      {/* etykiety (jeśli podane) */}
       {labels?.omega && (
-        <text x={mm(baseStartX + (side === "right" ? 8 : -8))}
-              y={mm(yOmegaTop + hO) - 6}
-              fontSize={11}
-              textAnchor={side === "right" ? "start" : "end"}
-              style={textStyle}>
+        <text
+          x={mm(baseStartX + (side === "right" ? 8 : -8))}
+          y={mm(yOmegaTop + hO) - 6}
+          fontSize={11}
+          textAnchor={side === "right" ? "start" : "end"}
+          style={textStyle}
+        >
           {labels.omega}
         </text>
       )}
       {labels?.base && (
-        <text x={mm((baseStartX + baseEndX) / 2)} y={mm(yOmegaTop) - 6}
-              fontSize={11} textAnchor="middle" style={textStyle}>
+        <text
+          x={mm((baseStartX + baseEndX) / 2)}
+          y={mm(yOmegaTop) - 6}
+          fontSize={11}
+          textAnchor="middle"
+          style={textStyle}
+        >
           {labels.base}
         </text>
       )}
       {labels?.vertical && (
-        <text x={mm(rightAxisX)} y={mm(outerH * 0.15))}
-              fontSize={11} textAnchor="middle" style={textStyle}>
+        <text
+          x={mm(rightAxisX)}
+          y={mm(outerH * 0.15)}
+          fontSize={11}
+          textAnchor="middle"
+          style={textStyle}
+        >
           {labels.vertical}
         </text>
       )}
       {labels?.diagonal && (
-        <text x={mm((rightAxisX + baseEndX) / 2)} y={mm((topAxisY + omegaAxisY) / 2) - 6}
-              fontSize={11} textAnchor="middle" style={textStyle}>
+        <text
+          x={mm((rightAxisX + baseEndX) / 2)}
+          y={mm((topAxisY + omegaAxisY) / 2) - 6}
+          fontSize={11}
+          textAnchor="middle"
+          style={textStyle}
+        >
           {labels.diagonal}
         </text>
       )}
       {labels?.support && (
-        <text x={mm((baseStartX + baseEndX) / 2)} y={mm(yBottomTop) - 6}
-              fontSize={11} textAnchor="middle" style={textStyle}>
+        <text
+          x={mm((baseStartX + baseEndX) / 2)}
+          y={mm(yBottomTop) - 6}
+          fontSize={11}
+          textAnchor="middle"
+          style={textStyle}
+        >
           {labels.support}
         </text>
       )}
-    </g>
-  );
-
-  return (
-    <g style={{ pointerEvents: "none" }}>
-      {bottomExt}
-      {omegaExt}
-      {skew1}
-      {skew2}
-      {labelsG}
     </g>
   );
 }
