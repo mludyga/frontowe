@@ -11,7 +11,7 @@ export type TailManualProps = {
   side: "left" | "right";
   labels?: TailManualLabels;
 
-  // parametry poglądowe (edytowalne z App – jeśli chcesz)
+  // parametry poglądowe (opcjonalne – z sensownymi domyślnymi)
   visBaseFrac?: number;       // długość podstawy jako ułamek H korpusu (domyślnie 0.8)
   bottomExtFrac?: number;     // przedłużenie dolnej ramy w % podstawy (domyślnie 0.5)
   skew2Frac?: number;         // start skosu #2 na podstawie (0..1, domyślnie 0.6)
@@ -29,30 +29,19 @@ export default function TailManual({
   const fillFrame = "#94a3b8";
   const dir = side === "right" ? 1 : -1;
 
-  // Referencje
-  const yOmegaTop = outerH + hA + hP;     // górna krawędź Omegi
-  const yBottomFrameTop = outerH - frameT;// górna krawędź dolnej ramy
+  // Referencje geometryczne
+  const yOmegaTop = outerH + hA + hP;           // górna krawędź Omegi
+  const yBottomFrameTop = outerH - frameT;      // górna krawędź dolnej ramy
   const baseLen = Math.max(0, outerH * visBaseFrac);
   const baseStartX = side === "right" ? outerW : 0;
   const baseEndX = baseStartX + dir * baseLen;
 
-  // Oś elementów (żeby łączenia były idealnie „na środku” grubości)
+  // Oś elementów (środek grubości) – żeby łączenia były równe
   const omegaAxisY = yOmegaTop + hO / 2;
   const rightAxisX = side === "right" ? outerW - frameT / 2 : frameT / 2; // oś pionu
   const topAxisY = frameT / 2;                                            // oś górnej ramy
 
-  // małe helpery (fill-only, bez stroke)
-  const R = (x: number, y: number, w: number, h: number) => (
-    <rect
-      x={mm(Math.min(x, x + w))}
-      y={mm(Math.min(y, y + h))}
-      width={mm(Math.abs(w))}
-      height={mm(Math.abs(h))}
-      fill={fillFrame}
-      vectorEffect="non-scaling-stroke"
-    />
-  );
-
+  // helper: „pas” o grubości t między (x1,y1) a (x2,y2) – fill-only
   const Band = (x1: number, y1: number, x2: number, y2: number, t: number) => {
     const dx = x2 - x1;
     const dy = y2 - y1;
@@ -70,30 +59,72 @@ export default function TailManual({
     return <polygon points={d} fill={fillFrame} vectorEffect="non-scaling-stroke" />;
   };
 
-  // 1) Przedłużenie Omegi – równoległe do Omegi, grubość = hO
-  const omegaExt = R(baseStartX, yOmegaTop, dir * baseLen, hO);
+  // ---- 1) OMEGA – przedłużenie z fazą przy czubku (równoległą do skosu #1) ----
+  // Skos #1 idzie po osi od (baseEndX, omegaAxisY) do (rightAxisX, topAxisY).
+  // Robimy obcięcie prostokąta omegi po linii równoległej do tej osi.
+  const dx1 = rightAxisX - baseEndX;
+  const dy1 = topAxisY - omegaAxisY;
+  // x na linii równoległej (przechodzącej przez punkt [baseEndX, omegaAxisY]) dla danego y:
+  const xOnCut = (y: number) => baseEndX + (dy1 === 0 ? 0 : (y - omegaAxisY) * (dx1 / dy1));
 
-  // 2) Przedłużenie dolnej ramy – długość = bottomExtFrac * baseLen, grubość = frameT
+  // Punkty wielokąta omegi z fazą:
+  const omegaPolyPoints = (() => {
+    const y0 = yOmegaTop;        // top
+    const y1 = yOmegaTop + hO;   // bottom
+    const xCutTop = xOnCut(y0);
+    const xCutBot = xOnCut(y1);
+    // Dla prawej strony idziemy zgodnie z ruchem wskazówek, dla lewej – odwrotnie
+    return side === "right"
+      ? [
+          [baseStartX, y0],
+          [xCutTop,   y0],
+          [xCutBot,   y1],
+          [baseStartX, y1],
+        ]
+      : [
+          [baseStartX, y0],
+          [baseStartX, y1],
+          [xCutBot,   y1],
+          [xCutTop,   y0],
+        ];
+  })();
+
+  const omegaExt = (
+    <polygon
+      points={omegaPolyPoints.map(([x, y]) => `${mm(x)},${mm(y)}`).join(" ")}
+      fill={fillFrame}
+      vectorEffect="non-scaling-stroke"
+    />
+  );
+
+  // ---- 2) Przedłużenie dolnej ramy (pozostawiamy prostokąt – tu zwykle jest OK) ----
   const botExtLen = baseLen * Math.max(0, Math.min(1, bottomExtFrac));
-  const bottomExt = R(baseStartX, yBottomFrameTop, dir * botExtLen, frameT);
+  const bottomExt = (
+    <rect
+      x={mm(Math.min(baseStartX, baseStartX + dir * botExtLen))}
+      y={mm(yBottomFrameTop)}
+      width={mm(Math.abs(botExtLen))}
+      height={mm(frameT)}
+      fill={fillFrame}
+      vectorEffect="non-scaling-stroke"
+    />
+  );
 
-  // 3) Skos #1 – oś od końca przedłużenia Omegi do osi górnej/prawej ramy
+  // ---- 3) Skos #1 (oś) – od końca omegi do osi górnej/pionu ----
   const skew1 = Band(
-    baseEndX,            // start po osi Omegi -> bierzemy oś w Y
-    omegaAxisY,
-    rightAxisX,          // koniec po osi narożnika (x po osi pionu, y po osi górnej ramy)
-    topAxisY,
+    baseEndX,    omegaAxisY,
+    rightAxisX,  topAxisY,
     frameT
   );
 
-  // 4) Skos #2 – oś od (skew2Frac * podstawa) do osi pionu na określonej wysokości
+  // ---- 4) Skos #2 (oś) – od części podstawy do osi pionu na zadanej wysokości ----
   const s2x0 = baseStartX + dir * (baseLen * Math.max(0, Math.min(1, skew2Frac)));
   const s2y0 = omegaAxisY;
   const s2x1 = rightAxisX;
   const s2y1 = outerH * Math.max(0, Math.min(1, skew2TargetHFrac));
   const skew2 = Band(s2x0, s2y0, s2x1, s2y1, frameT);
 
-  // 5) Napisy (poglądowo – klient wpisuje sam wartości)
+  // ---- 5) Napisy (poglądowo) ----
   const textStyle = {
     paintOrder: "stroke",
     stroke: "#fff",
